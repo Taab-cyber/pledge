@@ -28,6 +28,7 @@ export interface GeminiConfig {
   fastModel: string;
   fetch?: typeof fetch;
   timeoutMs?: number;
+  retryDelayMs?: number;
 }
 
 const ResponseSchema = z.object({
@@ -64,27 +65,35 @@ export function createGeminiProvider(cfg: GeminiConfig, opts: AIProviderOptions 
       { role: "user", parts: userParts },
       ...extra.map((t) => ({ role: t.role, parts: [{ text: t.text }] })),
     ];
-    let res: Response;
-    try {
-      res = await doFetch(`${API}/${encodeURIComponent(model)}:generateContent`, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": cfg.apiKey },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents,
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseJsonSchema: jsonSchemaFor(schema),
-            temperature: 0.2,
-          },
-        }),
-        signal: AbortSignal.timeout(cfg.timeoutMs ?? 90_000),
-      });
-    } catch (err) {
-      throw new AppError("UPSTREAM", "The AI service didn't respond. Please try again.", {
-        cause: err instanceof Error ? err.name : "unknown",
-      });
+    const body = JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseJsonSchema: jsonSchemaFor(schema),
+        temperature: 0.2,
+      },
+    });
+    let res: Response | undefined;
+    // The free tier sometimes answers 500/503 ("overloaded"): retry once after a short pause.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        res = await doFetch(`${API}/${encodeURIComponent(model)}:generateContent`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-goog-api-key": cfg.apiKey },
+          body,
+          signal: AbortSignal.timeout(cfg.timeoutMs ?? 90_000),
+        });
+      } catch (err) {
+        if (attempt === 0) continue;
+        throw new AppError("UPSTREAM", "The AI service didn't respond. Please try again.", {
+          cause: err instanceof Error ? err.name : "unknown",
+        });
+      }
+      if (res.status < 500 || attempt === 1) break;
+      await new Promise((r) => setTimeout(r, cfg.retryDelayMs ?? 1500));
     }
+    if (!res) throw new AppError("UPSTREAM", "The AI service didn't respond. Please try again.");
     if (res.status === 429) {
       throw new AppError(
         "RATE_LIMITED",

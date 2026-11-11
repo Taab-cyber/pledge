@@ -16,7 +16,8 @@
     "db:migrate": "node scripts/db.mjs migrate",
     "db:status": "node scripts/db.mjs status",
     "db:test-rls": "node scripts/db.mjs sql supabase/tests/rls_isolation.sql",
-    "test:integration": "vitest run src/server/services/flow.integration.test.ts"
+    "test:integration": "vitest run integration",
+    "demo:prepare": "tsx scripts/prepare-demo.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -39,6 +40,7 @@
     "pg": "^8.23.1",
     "prettier": "^3.9.10",
     "tailwindcss": "4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.1.0"
   },

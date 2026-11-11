@@ -1,9 +1,13 @@
 // Small typed client for /api/v1. Every response is validated against its zod schema.
 import type { z } from "zod";
 import {
+  AppConfigSchema,
   ApprovePlanResultSchema,
   DealDtoSchema,
   DealListSchema,
+  HoldOrderResultSchema,
+  MilestoneActionResultSchema,
+  RefundResultSchema,
   ErrorBodySchema,
   MeResponseSchema,
   PublicPlanSchema,
@@ -69,6 +73,7 @@ export function createApiClient(opts: ApiClientOptions = {}) {
   }
 
   return {
+    config: () => call("GET", "/config", AppConfigSchema),
     me: {
       get: () => call("GET", "/me", MeResponseSchema),
       update: (input: UpdateMeInput) => call("PATCH", "/me", MeResponseSchema, input),
@@ -92,6 +97,38 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         call("PUT", `/deals/${encodeURIComponent(id)}/plan`, DealDtoSchema, input),
       share: (id: string) =>
         call("POST", `/deals/${encodeURIComponent(id)}/share`, ShareResultSchema),
+    },
+    milestones: {
+      /** Client: create the PayPal order; pass the id to the PayPal buttons' createOrder. */
+      createHold: (id: string) =>
+        call("POST", `/milestones/${encodeURIComponent(id)}/hold`, HoldOrderResultSchema),
+      /** Client: call from the PayPal buttons' onApprove; the server authorizes with PayPal. */
+      confirmHold: (id: string, orderId: string) =>
+        call(
+          "POST",
+          `/milestones/${encodeURIComponent(id)}/hold/confirm`,
+          MilestoneActionResultSchema,
+          {
+            orderId,
+          },
+        ),
+      deliver: (id: string, note = "") =>
+        call("POST", `/milestones/${encodeURIComponent(id)}/deliver`, MilestoneActionResultSchema, {
+          note,
+        }),
+      release: (id: string, opts: { simulateDecline?: boolean } = {}) =>
+        call(
+          "POST",
+          `/milestones/${encodeURIComponent(id)}/release`,
+          MilestoneActionResultSchema,
+          opts,
+        ),
+      cancel: (id: string) =>
+        call("POST", `/milestones/${encodeURIComponent(id)}/cancel`, MilestoneActionResultSchema),
+    },
+    demo: {
+      refund: (milestoneId: string) =>
+        call("POST", "/demo/refund", RefundResultSchema, { milestoneId }),
     },
     publicPlans: {
       get: (token: string) =>

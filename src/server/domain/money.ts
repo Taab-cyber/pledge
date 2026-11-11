@@ -1,5 +1,5 @@
 // Money is integer minor units (bigint) + ISO-4217 code. Never floats.
-import { exponentOf } from "./currencies";
+import { anyCurrencyExponent, exponentOf } from "./currencies";
 
 export interface Money {
   minor: bigint;
@@ -108,4 +108,52 @@ export function equals(a: Money, b: Money): boolean {
 export function compare(a: Money, b: Money): -1 | 0 | 1 {
   assertSameCurrency(a, b);
   return a.minor < b.minor ? -1 : a.minor > b.minor ? 1 : 0;
+}
+
+/**
+ * Parses an amount PayPal reports (any currency, e.g. an INR settlement) to integer minor units.
+ * Unlike fromMajor it doesn't require a deal currency, and rounds nothing: extra decimals are an error.
+ */
+export function providerAmountToMinor(value: string, currency: string): bigint {
+  const exp = anyCurrencyExponent(currency);
+  const match = DECIMAL.exec(value.trim());
+  if (!match) throw new MoneyError(`Not a valid amount from provider: "${value}"`);
+  const [, sign, whole = "0", fraction = ""] = match;
+  const trimmed = fraction.replace(/0+$/, "");
+  if (trimmed.length > exp) throw new MoneyError(`Too many decimals for ${currency}: "${value}"`);
+  const minor = BigInt(whole) * 10n ** BigInt(exp) + BigInt(trimmed.padEnd(exp, "0") || "0");
+  return sign ? -minor : minor;
+}
+
+/** Display any currency (including ones that aren't deal currencies). */
+export function formatAnyCurrency(minor: bigint, currency: string, locale = "en-US"): string {
+  const exp = anyCurrencyExponent(currency);
+  const neg = minor < 0n;
+  const abs = neg ? -minor : minor;
+  const base = 10n ** BigInt(exp);
+  const text = exp === 0 ? `${abs}` : `${abs / base}.${(abs % base).toString().padStart(exp, "0")}`;
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: exp,
+    maximumFractionDigits: exp,
+  }).format(`${neg ? "-" : ""}${text}` as unknown as number);
+}
+
+/**
+ * Indicative conversion for display ("estimate, final rate set by PayPal"). Pledge never converts money.
+ * Exact integer math with the rate scaled to 8 decimals, rounded half-up once at the end.
+ */
+export function estimateConversion(
+  minor: bigint,
+  fromCurrency: string,
+  toCurrency: string,
+  rate: string,
+): bigint {
+  const m = /^(\d+)(?:\.(\d{1,8}))?\d*$/.exec(rate.trim());
+  if (!m) throw new MoneyError(`Not a valid rate: "${rate}"`);
+  const scaledRate = BigInt(m[1]!) * 10n ** 8n + BigInt((m[2] ?? "").padEnd(8, "0"));
+  const num = minor * scaledRate * 10n ** BigInt(anyCurrencyExponent(toCurrency));
+  const den = 10n ** 8n * 10n ** BigInt(anyCurrencyExponent(fromCurrency));
+  return (num * 2n + den) / (2n * den);
 }

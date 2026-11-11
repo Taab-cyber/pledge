@@ -61,8 +61,25 @@ const MilestoneRowSchema = z.object({
   todos: z.array(
     z.object({ id: z.uuid(), position: z.number().int(), label: z.string(), done: z.boolean() }),
   ),
+  // Payment state (Phase 4). Defaults keep older test fixtures valid.
+  due_date: z.string().nullable().default(null),
+  authorization_id: z.string().nullable().default(null),
+  hold_expires_at: z.string().nullable().default(null),
+  honor_expires_at: z.string().nullable().default(null),
+  delivered_at: z.string().nullable().default(null),
+  release_at: z.string().nullable().default(null),
+  captured_at: z.string().nullable().default(null),
+  capture_id: z.string().nullable().default(null),
+  capture_status: z.string().nullable().default(null),
+  gross_minor: z.number().int().nullable().default(null),
+  fee_minor: z.number().int().nullable().default(null),
+  net_minor: z.number().int().nullable().default(null),
+  receivable_minor: z.number().int().nullable().default(null),
+  settlement_currency: z.string().nullable().default(null),
+  fx_rate: z.union([z.number(), z.string()]).nullable().default(null),
+  last_payment_error: z.record(z.string(), z.unknown()).nullable().default(null),
 });
-export type MilestoneRow = z.infer<typeof MilestoneRowSchema>;
+export type MilestoneRow = z.input<typeof MilestoneRowSchema>;
 
 const ChangeRequestRowSchema = z.object({
   id: z.uuid(),
@@ -160,7 +177,7 @@ export async function listMilestones(db: SupabaseClient, dealId: string): Promis
   const { data, error } = await db
     .from("milestones")
     .select(
-      "id, kind, position, title, amount_minor, due_in_days, revisions_included, revisions_used, status, todos(id, position, label, done)",
+      "id, kind, position, title, amount_minor, due_in_days, revisions_included, revisions_used, status, due_date, authorization_id, hold_expires_at, honor_expires_at, delivered_at, release_at, captured_at, capture_id, capture_status, gross_minor, fee_minor, net_minor, receivable_minor, settlement_currency, fx_rate, last_payment_error, todos(id, position, label, done)",
     )
     .eq("deal_id", dealId)
     .order("kind")

@@ -30,6 +30,7 @@ import { downloadPrivate, removePrivate, uploadPrivate } from "../repos/storage"
 import { adminClient } from "../repos/supabase";
 import { aiFor, assertAiQuota } from "./ai";
 import { moneyDto, toDealDto } from "./deal-view";
+import { estimate } from "./fx";
 
 export interface UploadedFile {
   name: string;
@@ -64,11 +65,21 @@ async function loadOwnDeal(auth: AuthContext, dealId: string): Promise<DealRow> 
 
 export async function getDeal(auth: AuthContext, dealId: string): Promise<DealDto> {
   const deal = await loadDeal(auth, dealId);
-  const [milestones, changes] = await Promise.all([
+  const [milestones, changes, freelancer] = await Promise.all([
     listMilestones(auth.db, deal.id),
     listChangeRequests(auth.db, deal.id),
+    getProfile(adminClient(), deal.freelancer_id),
   ]);
-  return toDealDto(deal, milestones, changes, auth.userId);
+  // Display-only estimates in each side's home currency; failures just hide the estimate.
+  const total = BigInt(deal.total_minor);
+  const [forFreelancer, forClient] = await Promise.all([
+    estimate(total, deal.currency, freelancer.country_code),
+    estimate(total, deal.currency, deal.client_country),
+  ]);
+  return toDealDto(deal, milestones, changes, auth.userId, {
+    estimates: { freelancer: forFreelancer, client: forClient },
+    demoMode: env().DEMO_MODE,
+  });
 }
 
 export async function listMyDeals(auth: AuthContext): Promise<DealList> {

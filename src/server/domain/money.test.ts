@@ -94,3 +94,21 @@ describe("suggestDealCurrency", () => {
     });
   });
 });
+
+describe("provider amounts and estimates", () => {
+  it("parses PayPal amounts in any currency exactly", async () => {
+    const { providerAmountToMinor, formatAnyCurrency } = await import("./money");
+    expect(providerAmountToMinor("48123.55", "INR")).toBe(4812355n);
+    expect(providerAmountToMinor("1200", "HUF")).toBe(1200n);
+    expect(() => providerAmountToMinor("1.5", "JPY")).toThrow();
+    expect(formatAnyCurrency(4812355n, "INR", "en-IN")).toBe("₹48,123.55");
+  });
+
+  it("converts for display with one rounding step", async () => {
+    const { estimateConversion } = await import("./money");
+    expect(estimateConversion(40000n, "GBP", "INR", "124.67")).toBe(4986800n); // £400 → ₹49,868.00
+    expect(estimateConversion(1n, "USD", "JPY", "151.5")).toBe(2n); // 1.515 → 2 (half-up)
+    expect(estimateConversion(10000n, "JPY", "USD", "0.0066")).toBe(6600n); // ¥10,000 → $66.00
+    expect(() => estimateConversion(1n, "USD", "EUR", "abc")).toThrow();
+  });
+});

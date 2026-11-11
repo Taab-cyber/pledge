@@ -8,5 +8,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // Integration tests talk to the real Supabase project over the network.
+    hookTimeout: 120_000,
+    testTimeout: 120_000,
   },
 });

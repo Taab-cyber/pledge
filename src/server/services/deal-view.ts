@@ -1,6 +1,6 @@
 // Maps rows to API DTOs. Amounts leave the server as integer minor units + a formatted string.
 import type { DealDto, MoneyDto } from "@/sdk/schemas";
-import { fromMajor, format, money } from "../domain/money";
+import { formatAnyCurrency, fromMajor, format, money } from "../domain/money";
 import { validatePlan, type PlanIssue } from "../domain/plan";
 import type { ChangeRequestRow, DealRow, MilestoneRow } from "../repos/deals";
 
@@ -39,6 +39,7 @@ export function toDealDto(
   milestones: MilestoneRow[],
   changes: ChangeRequestRow[],
   viewerId: string,
+  extras: { estimates?: DealDto["estimates"]; demoMode?: boolean } = {},
 ): DealDto {
   const viewerRole = deal.freelancer_id === viewerId ? "freelancer" : "client";
   const plan = milestones.filter((m) => m.kind === "milestone");
@@ -89,6 +90,7 @@ export function toDealDto(
       revisionsUsed: m.revisions_used,
       status: m.status,
       todos: m.todos.map((t) => ({ id: t.id, label: t.label, done: t.done })),
+      payment: paymentDto(m, deal.currency),
     })),
     sum: moneyDto(sumMinor, deal.currency),
     difference: moneyDto(deal.total_minor - sumMinor, deal.currency),
@@ -102,5 +104,45 @@ export function toDealDto(
       createdAt: c.created_at,
     })),
     createdAt: deal.created_at,
+    estimates: extras.estimates ?? { freelancer: null, client: null },
+    demoMode: extras.demoMode ?? false,
+  };
+}
+
+function anyMoneyDto(
+  minor: number | null | undefined,
+  currency: string | null | undefined,
+): MoneyDto | null {
+  if (minor === null || minor === undefined || !currency) return null;
+  return { minor, currency, formatted: formatAnyCurrency(BigInt(minor), currency) };
+}
+
+/** Payment state for one milestone; payout figures are exactly what PayPal reported at capture. */
+export function paymentDto(
+  m: MilestoneRow,
+  currency: string,
+): DealDto["milestones"][number]["payment"] {
+  const captured = m.capture_id ?? null;
+  return {
+    dueDate: m.due_date ?? null,
+    authorizationId: m.authorization_id ?? null,
+    holdExpiresAt: m.hold_expires_at ?? null,
+    honorExpiresAt: m.honor_expires_at ?? null,
+    deliveredAt: m.delivered_at ?? null,
+    releaseAt: m.release_at ?? null,
+    capturedAt: m.captured_at ?? null,
+    captureId: captured,
+    captureStatus: m.capture_status ?? null,
+    payout: captured
+      ? {
+          gross: anyMoneyDto(m.gross_minor, currency),
+          fee: anyMoneyDto(m.fee_minor, currency),
+          net: anyMoneyDto(m.net_minor, currency),
+          received: anyMoneyDto(m.receivable_minor, m.settlement_currency),
+          fxRate: m.fx_rate === null || m.fx_rate === undefined ? null : String(m.fx_rate),
+        }
+      : null,
+    lastError:
+      (m.last_payment_error as DealDto["milestones"][number]["payment"]["lastError"]) ?? null,
   };
 }

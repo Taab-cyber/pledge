@@ -141,8 +141,49 @@ export const MilestoneDtoSchema = z.object({
   revisionsUsed: z.int(),
   status: z.enum(MILESTONE_STATUSES),
   todos: z.array(TodoDtoSchema),
+  payment: z.object({
+    dueDate: z.string().nullable(),
+    /** PayPal authorization id while a hold exists (shown for the sandbox split-screen). */
+    authorizationId: z.string().nullable(),
+    holdExpiresAt: z.string().nullable(),
+    honorExpiresAt: z.string().nullable(),
+    deliveredAt: z.string().nullable(),
+    /** Auto-release time; null without consent or while changes are requested / hold at risk. */
+    releaseAt: z.string().nullable(),
+    capturedAt: z.string().nullable(),
+    captureId: z.string().nullable(),
+    captureStatus: z.string().nullable(),
+    /** Actual figures from PayPal's capture response (seller_receivable_breakdown). */
+    payout: z
+      .object({
+        gross: MoneyDtoSchema.nullable(),
+        fee: MoneyDtoSchema.nullable(),
+        net: MoneyDtoSchema.nullable(),
+        received: MoneyDtoSchema.nullable(),
+        fxRate: z.string().nullable(),
+      })
+      .nullable(),
+    lastError: z
+      .object({
+        action: z.string().optional(),
+        code: z.string().optional(),
+        message: z.string().optional(),
+        issue: z.string().optional(),
+        debugId: z.string().optional(),
+        at: z.string().optional(),
+      })
+      .passthrough()
+      .nullable(),
+  }),
 });
 export type MilestoneDto = z.infer<typeof MilestoneDtoSchema>;
+
+export const EstimateDtoSchema = z.object({
+  amount: MoneyDtoSchema,
+  rate: z.string(),
+  asOf: z.string(),
+  note: z.literal("estimate, final rate set by PayPal"),
+});
 
 export const PlanMetaDtoSchema = z.object({
   summary: z.string(),
@@ -188,6 +229,12 @@ export const DealDtoSchema = z.object({
   issues: z.array(PlanIssueDtoSchema),
   canShare: z.boolean(),
   changeRequests: z.array(ChangeRequestDtoSchema),
+  /** Indicative totals in each side's home currency (null when same currency or unavailable). */
+  estimates: z.object({
+    freelancer: EstimateDtoSchema.nullable(),
+    client: EstimateDtoSchema.nullable(),
+  }),
+  demoMode: z.boolean(),
   createdAt: z.string(),
 });
 export type DealDto = z.infer<typeof DealDtoSchema>;
@@ -261,3 +308,31 @@ export const ApprovePlanResultSchema = z.object({
   dealId: z.uuid(),
   status: z.enum(DEAL_STATUSES),
 });
+
+// ── Milestone payments ───────────────────────────────────────────────────────
+
+export const HoldOrderResultSchema = z.object({ orderId: z.string() });
+export const ConfirmHoldInputSchema = z.object({ orderId: z.string().min(1).max(64) }).strict();
+export const DeliverInputSchema = z
+  .object({ note: z.string().trim().max(5000).default("") })
+  .strict();
+export const ReleaseInputSchema = z
+  .object({
+    /** DEMO_MODE only: ask the PayPal sandbox to decline this capture (negative testing). */
+    simulateDecline: z.boolean().optional(),
+  })
+  .strict();
+export const MilestoneActionResultSchema = z
+  .object({
+    status: z.enum(MILESTONE_STATUSES),
+    captureStatus: z.string().optional(),
+    releaseAt: z.string().nullable().optional(),
+  })
+  .passthrough();
+export const RefundResultSchema = z.object({ refundId: z.string(), status: z.string() });
+
+export const AppConfigSchema = z.object({
+  demoMode: z.boolean(),
+  paypalClientId: z.string().nullable(),
+});
+export type AppConfig = z.infer<typeof AppConfigSchema>;

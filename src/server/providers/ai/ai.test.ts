@@ -187,3 +187,24 @@ describe("mock provider", () => {
     ).toEqual(["Add dark mode", "Make it blue"]);
   });
 });
+
+describe("gemini retries", () => {
+  it("retries once on a 503 and then succeeds", async () => {
+    let n = 0;
+    const fetchMock = (async () => {
+      n++;
+      return n === 1
+        ? new Response("overloaded", { status: 503 })
+        : Response.json({ candidates: [{ content: { parts: [{ text: '{"changes":["x"]}' }] } }] });
+    }) as unknown as typeof fetch;
+    const ai = createGeminiProvider({
+      apiKey: "k",
+      model: "m",
+      fastModel: "m",
+      fetch: fetchMock,
+      retryDelayMs: 0,
+    });
+    expect(await ai.summarizeChanges({ note: "x", todos: [] })).toEqual({ changes: ["x"] });
+    expect(n).toBe(2);
+  });
+});

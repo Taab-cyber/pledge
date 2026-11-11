@@ -36,3 +36,15 @@ export function currencyInfo(code: string): CurrencyInfo {
 export function exponentOf(code: string): number {
   return currencyInfo(code).exponent;
 }
+
+/** PayPal's zero-decimal currencies (it rejects decimals for these). */
+const ZERO_DECIMAL = new Set(["JPY", "HUF", "TWD"]);
+
+/**
+ * Exponent for any currency PayPal may report back (e.g. INR settlement), not just deal currencies.
+ * Display/storage only: deals themselves must use a supported currency.
+ */
+export function anyCurrencyExponent(code: string): number {
+  if (isSupportedCurrency(code)) return SUPPORTED_CURRENCIES[code].exponent;
+  return ZERO_DECIMAL.has(code) ? 0 : 2;
+}
