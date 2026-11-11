@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
+/* Pledge design tokens (BUILD.md §9 Phase 7). Light theme: the brand palette is designed for it. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --accent: #0b6e5b;
+  --accent-soft: #e7f3ef;
+  --ink: #101828;
+  --ink-soft: #475467;
+  --ground: #f3f5f4;
+  --card: #ffffff;
+  --line: #e4e7ec;
+  --warn-ink: #8a4b00;
+  --warn-bg: #fff6e6;
+  --error-ink: #a3261a;
+  --error-bg: #fdf0ef;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ground: var(--ground);
+  --color-card: var(--card);
+  --color-line: var(--line);
+  --color-warn: var(--warn-ink);
+  --color-warn-bg: var(--warn-bg);
+  --color-error: var(--error-ink);
+  --color-error-bg: var(--error-bg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Visible focus for keyboard users on every interactive element. */
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+input,
+select,
+textarea {
+  background: #fff;
+  color: var(--ink);
 }

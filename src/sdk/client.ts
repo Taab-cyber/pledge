@@ -5,6 +5,7 @@ import {
   AppConfigSchema,
   CheckDeliveryResultSchema,
   DeliverResultSchema,
+  DemoLoginResultSchema,
   MessageResultSchema,
   RequestChangesResultSchema,
   UploadSlotsResultSchema,
@@ -210,6 +211,10 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         call("POST", `/agent-actions/${encodeURIComponent(id)}/dismiss`, AgentResultSchema),
     },
     demo: {
+      login: (as: "freelancer" | "client") =>
+        call("POST", "/demo/login", DemoLoginResultSchema, { as }),
+      deliver: (milestoneId: string, skipLast = false) =>
+        call("POST", "/demo/deliver", DeliverResultSchema, { milestoneId, skipLast }),
       fastForward: (dealId: string, what: "release" | "renewal") =>
         call("POST", "/demo/fast-forward", FastForwardResultSchema, { dealId, what }),
       refund: (milestoneId: string) =>

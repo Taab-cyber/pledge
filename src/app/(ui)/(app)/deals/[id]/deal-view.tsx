@@ -1,24 +1,13 @@
 "use client";
 
-// Minimal deal page for Phase 4 testing (Phase 7 replaces it with the full design).
-import Link from "next/link";
+// Deal page for both sides: milestones, PayPal holds, deliveries, AI check, Deal Agent, demo controls.
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type AppConfig, type DealDto, type MilestoneDto } from "@/sdk/browser";
+import { api, ApiError, type AppConfig, type DealDto } from "@/sdk/browser";
 import { AgentFeed, MessageBox } from "./agent-feed";
 import { DeliveryForm, DeliveryView, RequestChanges } from "./delivery-panel";
+import { Banner, DealStatus, LinkButton, MilestoneStatus, PageHeader } from "../../../_ui/kit";
 import { PayPalHoldButtons } from "./paypal-buttons";
-
-const STATUS_TEXT: Record<MilestoneDto["status"], string> = {
-  draft: "Not started",
-  awaiting_hold: "Waiting for the client to secure payment",
-  held: "Secured — not charged yet",
-  hold_at_risk: "Hold at risk",
-  delivered: "Delivered — waiting for approval",
-  changes_requested: "Changes requested",
-  released: "Paid",
-  voided: "Cancelled",
-};
 
 const btn = "min-h-11 rounded-lg px-4 font-medium disabled:opacity-60";
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
@@ -63,7 +52,11 @@ export function DealView() {
     api
       .config()
       .then((c) => alive && setConfig(c))
-      .catch(() => alive && setConfig({ demoMode: false, paypalClientId: null }));
+      .catch(
+        () =>
+          alive &&
+          setConfig({ demoMode: false, paypalClientId: null, countries: [], currencies: [] }),
+      );
     return () => {
       alive = false;
     };
@@ -92,52 +85,59 @@ export function DealView() {
 
   if (!deal) {
     return (
-      <main className="mx-auto w-full max-w-2xl p-6">
-        {message ? <p role="alert">{message.text}</p> : <p>Loading…</p>}
-      </main>
+      <div className="text-sm text-ink-soft">
+        {message ? <Banner tone="error">{message.text}</Banner> : "Loading…"}
+      </div>
     );
   }
   const isClient = deal.viewerRole === "client";
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-5 p-6">
-      <header className="flex flex-col gap-1">
-        <Link href="/deals" className="text-sm underline">
-          ← All deals
-        </Link>
-        <h1 className="text-2xl font-semibold">{deal.title}</h1>
-        <p className="text-sm text-neutral-700">
-          {deal.total.formatted} · {deal.status} · you are the {deal.viewerRole}
-        </p>
-        {deal.estimates[isClient ? "client" : "freelancer"] && (
-          <p className="text-sm text-neutral-700">
-            ≈ {deal.estimates[isClient ? "client" : "freelancer"]!.amount.formatted} (
-            {deal.estimates[isClient ? "client" : "freelancer"]!.note})
-          </p>
-        )}
-      </header>
+    <>
+      <PageHeader
+        title={deal.title}
+        subtitle={
+          <span className="flex flex-wrap items-center gap-2">
+            {isClient ? "Your project" : `Client: ${deal.clientName}`} · {deal.total.formatted}
+            <DealStatus status={deal.status} />
+            {deal.estimates[isClient ? "client" : "freelancer"] && (
+              <span>
+                ≈ {deal.estimates[isClient ? "client" : "freelancer"]!.amount.formatted} (
+                {deal.estimates[isClient ? "client" : "freelancer"]!.note})
+              </span>
+            )}
+          </span>
+        }
+        actions={
+          !isClient && (
+            <LinkButton href={`/deals/${deal.id}/plan`} variant="secondary">
+              {deal.status === "draft" || deal.status === "shared"
+                ? "Edit plan & share"
+                : "View plan"}
+            </LinkButton>
+          )
+        }
+      />
 
-      {message && (
-        <p
-          role={message.kind === "error" ? "alert" : "status"}
-          className={`rounded-lg p-3 text-sm ${message.kind === "error" ? "bg-[#FDF0EF] text-[#A3261A]" : "bg-[#E7F3EF] text-[#0B6E5B]"}`}
-        >
-          {message.text}
-        </p>
-      )}
+      {message && <Banner tone={message.kind === "error" ? "error" : "ok"}>{message.text}</Banner>}
 
       <ol className="flex flex-col gap-3">
         {deal.milestones.map((m) => (
           <li
             key={m.id}
-            className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-4 text-neutral-900"
+            className="flex flex-col gap-3 rounded-[18px] border border-line bg-card p-5"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-semibold">
                   {m.kind === "addon" ? "Add-on" : `${m.position + 1}.`} {m.title}
                 </h2>
-                <p className="text-sm">{STATUS_TEXT[m.status]}</p>
+                <div className="mt-1">
+                  <MilestoneStatus
+                    status={m.status}
+                    addonOffer={m.kind === "addon" && m.status === "draft"}
+                  />
+                </div>
               </div>
               <strong>{m.amount.formatted}</strong>
             </div>
@@ -295,6 +295,36 @@ export function DealView() {
               </p>
             )}
 
+            {/* Demo: let a judge playing the client have the freelancer deliver sample files */}
+            {isClient && deal.demoMode && m.status === "held" && (
+              <div className="flex flex-wrap gap-2 rounded-xl border border-dashed border-warn bg-warn-bg p-3 text-sm text-warn">
+                <span className="w-full">
+                  Demo: there&apos;s no real freelancer here, so you can make Riya deliver sample
+                  files now.
+                </span>
+                <button
+                  className={`${btn} border border-warn`}
+                  disabled={busy}
+                  onClick={() =>
+                    act("Riya delivered. Review it below.", () => api.demo.deliver(m.id))
+                  }
+                >
+                  Demo: freelancer delivers now
+                </button>
+                <button
+                  className={`${btn} border border-warn`}
+                  disabled={busy}
+                  onClick={() =>
+                    act("Riya delivered, but left one item out.", () =>
+                      api.demo.deliver(m.id, true),
+                    )
+                  }
+                >
+                  Demo: deliver with one item missing
+                </button>
+              </div>
+            )}
+
             {/* Freelancer: deliver with files + AI pre-check */}
             {!isClient && (m.status === "held" || m.status === "changes_requested") && (
               <DeliveryForm
@@ -393,6 +423,6 @@ export function DealView() {
 
       <AgentFeed deal={deal} run={act} />
       <MessageBox deal={deal} run={act} />
-    </main>
+    </>
   );
 }

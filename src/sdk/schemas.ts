@@ -300,6 +300,15 @@ export const DealListItemSchema = z.object({
   total: MoneyDtoSchema,
   currentVersion: z.int(),
   createdAt: z.string(),
+  /** The other party: client name for freelancers, freelancer name for clients. */
+  counterpartName: z.string(),
+  /** Secured with PayPal, not charged yet (held / delivered / changes requested / at risk). */
+  held: MoneyDtoSchema,
+  released: MoneyDtoSchema,
+  releasedThisMonth: MoneyDtoSchema,
+  /** Plain-language next step for this viewer, or null when nothing is waiting on them. */
+  nextStep: z.string().nullable(),
+  waitingOnYou: z.boolean(),
 });
 export const DealListSchema = z.object({ deals: z.array(DealListItemSchema) });
 export type DealList = z.infer<typeof DealListSchema>;
@@ -386,6 +395,22 @@ export const RefundResultSchema = z.object({ refundId: z.string(), status: z.str
 export const AppConfigSchema = z.object({
   demoMode: z.boolean(),
   paypalClientId: z.string().nullable(),
+  countries: z
+    .array(
+      z.object({
+        code: z.string(),
+        name: z.string(),
+        currency: z.string(),
+        reason: z.string().nullable(),
+      }),
+    )
+    .default([]),
+  currencies: z.array(z.string()).default([]),
+});
+
+export const DemoLoginResultSchema = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string(),
 });
 export type AppConfig = z.infer<typeof AppConfigSchema>;
 

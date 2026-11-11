@@ -29,6 +29,10 @@ const serverEnvSchema = z
 
     JOBS_SECRET: optional(z.string().min(32, "JOBS_SECRET must be at least 32 characters")),
     DEMO_MODE: z.preprocess(blankToUndefined, z.stringbool().default(false)),
+    // Judge access ("Try as freelancer / client"): seeded demo accounts, used only when DEMO_MODE=true.
+    DEMO_FREELANCER_EMAIL: optional(z.email()),
+    DEMO_CLIENT_EMAIL: optional(z.email()),
+    DEMO_PASSWORD: optional(z.string().min(12)),
   })
   .superRefine((env, ctx) => {
     if (env.AI_PROVIDER === "gemini" && !env.GEMINI_API_KEY) {

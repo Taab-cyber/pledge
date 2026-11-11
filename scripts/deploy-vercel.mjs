@@ -52,6 +52,8 @@ const plain = [
   "DEMO_MODE",
   "GEMINI_MODEL",
   "GEMINI_FAST_MODEL",
+  "DEMO_FREELANCER_EMAIL",
+  "DEMO_CLIENT_EMAIL",
 ];
 const secret = [
   "SUPABASE_SERVICE_ROLE_KEY",
@@ -60,6 +62,7 @@ const secret = [
   "PAYPAL_CLIENT_SECRET",
   "PAYPAL_WEBHOOK_ID",
   "JOBS_SECRET",
+  "DEMO_PASSWORD",
 ];
 const vars = [];
 for (const key of [...plain, ...secret]) {
