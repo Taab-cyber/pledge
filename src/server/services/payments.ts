@@ -246,7 +246,10 @@ function captureColumns(r: CaptureResult) {
 export async function releaseMilestone(
   actor: Actor,
   milestoneId: string,
-  opts: { simulate?: Simulate } = {},
+  opts: {
+    simulate?: Simulate;
+    /** tick time (tests / fast-forward); defaults to now */ now?: Date;
+  } = {},
 ) {
   const { ms, deal } = await load(milestoneId);
   if (actor.kind === "client") requireParty(deal, actor.auth, "client");
@@ -259,7 +262,7 @@ export async function releaseMilestone(
     actor.kind === "auto" &&
     !isDueForAutoRelease(
       { status: ms.status, release_at: ms.release_at ? new Date(ms.release_at) : null },
-      new Date(),
+      opts.now ?? new Date(),
     )
   ) {
     throw new AppError("CONFLICT", "Auto-release isn't due for this milestone.");
@@ -448,6 +451,8 @@ export async function renewHold(milestoneId: string, opts: { simulate?: Simulate
   const { ms, deal } = await load(milestoneId);
   if (!hasLiveHold(ms.status) || !ms.authorization_id)
     throw new AppError("CONFLICT", "No live hold to renew.");
+  // Never reauthorize a hold that is being captured (a parallel release owns it).
+  if (ms.capture_claim) throw new AppError("CONFLICT", "Payment is being released; not renewing.");
   try {
     const r = await getPaymentProvider().renewHold({
       authorizationId: ms.authorization_id,
@@ -460,7 +465,7 @@ export async function renewHold(milestoneId: string, opts: { simulate?: Simulate
     const updated = await updateMilestoneIf(
       admin(),
       ms.id,
-      { status: ms.status, where: { authorization_id: ms.authorization_id } },
+      { status: ms.status, where: { authorization_id: ms.authorization_id, capture_claim: null } },
       {
         status: to,
         authorization_id: r.authorizationId,
@@ -507,6 +512,48 @@ export async function renewHold(milestoneId: string, opts: { simulate?: Simulate
     });
     return { ok: false as const, status: to, error: errorRecord(err, "reauthorize") };
   }
+}
+
+// ── Re-secure after a failed renewal ─────────────────────────────────────────
+
+/** Client: drop the at-risk hold (void it if PayPal still has it) and start a fresh one. */
+export async function resecureMilestone(auth: AuthContext, milestoneId: string) {
+  const { ms, deal } = await load(milestoneId);
+  requireParty(deal, auth, "client");
+  if (!canTransition(ms.status, "resecure")) {
+    throw new AppError("CONFLICT", "This milestone doesn't need re-securing.");
+  }
+  if (ms.authorization_id) {
+    try {
+      await getPaymentProvider().cancelHold({
+        authorizationId: ms.authorization_id,
+        idempotencyKey: `${ms.id}:void:${ms.authorization_id}`,
+      });
+    } catch {
+      // Already expired/voided at PayPal: nothing to release.
+    }
+  }
+  const updated = await updateMilestoneIf(
+    admin(),
+    ms.id,
+    { status: "hold_at_risk" },
+    {
+      status: "awaiting_hold",
+      authorization_id: null,
+      paypal_order_id: null,
+      hold_expires_at: null,
+      honor_expires_at: null,
+      release_at: null,
+    },
+  );
+  if (!updated) throw new AppError("CONFLICT", "This milestone changed. Reload and try again.");
+  await logEvent(admin(), {
+    deal_id: deal.id,
+    milestone_id: ms.id,
+    actor_role: "client",
+    type: "resecure_started",
+  });
+  return { status: "awaiting_hold" as const };
 }
 
 // ── Refund (demo/admin only) ─────────────────────────────────────────────────

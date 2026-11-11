@@ -43,6 +43,17 @@ function AgentCard(props: {
       : "",
   );
   const open = a.status === "proposed";
+  const approver: Record<string, "client" | "freelancer"> = {
+    release_payment: "client",
+    resecure: "client",
+    propose_extra_revision: "freelancer",
+  };
+  const canApprove = open && approver[a.kind] === props.deal.viewerRole;
+  const approveLabel: Record<string, string> = {
+    release_payment: "Approve and pay",
+    resecure: "Start a new hold",
+    propose_extra_revision: "Send paid extra round",
+  };
   return (
     <li className="flex flex-col gap-2 rounded-2xl border border-[#0B6E5B]/30 bg-[#E7F3EF] p-3 text-sm text-neutral-900">
       <div className="flex items-start justify-between gap-2">
@@ -79,6 +90,28 @@ function AgentCard(props: {
           >
             Send add-on
           </button>
+        </div>
+      )}
+      {(canApprove || open) && (
+        <div className="flex flex-wrap gap-2">
+          {canApprove && (
+            <button
+              className={`${btn} bg-[#0B6E5B] text-white`}
+              onClick={() =>
+                props.run("Done. The Deal Agent carried it out.", () => api.agent.approve(a.id))
+              }
+            >
+              {approveLabel[a.kind] ?? "Approve"}
+            </button>
+          )}
+          {open && (
+            <button
+              className={`${btn} border border-neutral-400 text-neutral-800`}
+              onClick={() => props.run("Dismissed.", () => api.agent.dismiss(a.id))}
+            >
+              Dismiss
+            </button>
+          )}
         </div>
       )}
     </li>

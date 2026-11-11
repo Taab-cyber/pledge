@@ -21,8 +21,28 @@ Deadline: Devpost, Nov 12 2026 12:00 PM PT. Our target: Nov 12, 9:00 PM IST.
 - Phase 4 — PayPal holds/capture/void/webhooks + Vercel deploy: **done**, except the live browser run
   (client approves a real sandbox hold in PayPal's popup → capture). The user deferred it to the end.
 - Phase 5 — deliveries, AI check, scope guard, previews, revisions, add-ons: **done** (deployed)
-- Next: Phase 6 — jobs tick (pg_cron + pg_net), Deal Agent approve/dismiss endpoints, demo fast-forward,
-  forced renewal failure. Needs `JOBS_SECRET`.
+- Phase 6 — jobs tick + Deal Agent + fast-forward: **done** (pg_cron → pg_net → live tick verified, 200)
+- Next: Phase 7 — UI polish on the SDK, judge "Try as freelancer/client", seed data, README, docs/DEMO.md, LICENSE.
+
+## Jobs, Deal Agent, demo (Phase 6)
+
+- `POST /api/jobs/tick` (header `x-jobs-secret` = JOBS_SECRET, timing-safe) → `runTick()` in
+  `services/jobs.ts`: 1) auto-release delivered milestones past `release_at` (claim → capture), 2) renew live
+  holds past `honor_expires_at` (skips anything claimed or due for release; failure → `hold_at_risk` + `resecure`
+  proposal with PayPal's error), 3) one in-app reminder per milestone 24 h before auto-release.
+  `runTick({ dealId, now })` is used by tests and fast-forward; `releaseMilestone` takes `opts.now`.
+- Scheduler: pg_cron job `pledge-tick` (`*/15 * * * *`) runs `private.call_tick()`, which reads the URL and
+  secret from Supabase Vault (`pledge_tick_url`, `pledge_jobs_secret`) and calls `net.http_post`. Set/rotate
+  with `npx tsx scripts/set-tick-config.ts https://pledge-one.vercel.app`. Check: `select * from net._http_response order by created desc limit 3`.
+- Deal Agent: `POST /api/v1/agent-actions/:id/approve|dismiss`. Approve claims proposed → approved, runs the
+  service (release_payment → capture; resecure → void + awaiting_hold; propose_addon / propose_extra_revision →
+  add-on), then executed; on failure back to proposed. Auto rows: `auto_released`, `hold_renewed`,
+  `reminder_release` (status auto_executed, informational).
+- Demo (DEMO_MODE only): `POST /api/v1/demo/fast-forward {dealId, what: "release"|"renewal"}` moves
+  `release_at` / `honor_expires_at` into the past, then runs the tick for that deal → real PayPal capture /
+  reauthorize. A fresh hold reauthorized early gets PayPal's real "too soon" error → hold at risk (this is the
+  "forced renewal failure"; negative testing doesn't cover reauthorize). UI: "Demo controls" box on the deal page.
+- `POST /api/v1/milestones/:id/resecure` (client) for holds at risk.
 
 ## Deliveries & scope guard (Phase 5)
 

@@ -37,6 +37,20 @@ export interface AddonPayload {
 }
 const FileUrlSchema = z.object({ url: z.string() });
 const TodoResultSchema = z.object({ id: z.string(), done: z.boolean() });
+const AgentResultSchema = z.object({ status: z.enum(["executed", "dismissed"]) }).passthrough();
+const FastForwardResultSchema = z
+  .object({
+    skipped: z.enum(["release", "renewal"]),
+    milestones: z.number(),
+    tick: z
+      .object({
+        released: z.array(z.string()),
+        renewed: z.array(z.string()),
+        atRisk: z.array(z.string()),
+      })
+      .passthrough(),
+  })
+  .passthrough();
 
 export class ApiError extends Error {
   constructor(
@@ -180,6 +194,8 @@ export function createApiClient(opts: ApiClientOptions = {}) {
           MilestoneActionResultSchema,
           opts,
         ),
+      resecure: (id: string) =>
+        call("POST", `/milestones/${encodeURIComponent(id)}/resecure`, MilestoneActionResultSchema),
       cancel: (id: string) =>
         call("POST", `/milestones/${encodeURIComponent(id)}/cancel`, MilestoneActionResultSchema),
     },
@@ -187,7 +203,15 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       set: (id: string, done: boolean) =>
         call("PATCH", `/todos/${encodeURIComponent(id)}`, TodoResultSchema, { done }),
     },
+    agent: {
+      approve: (id: string) =>
+        call("POST", `/agent-actions/${encodeURIComponent(id)}/approve`, AgentResultSchema),
+      dismiss: (id: string) =>
+        call("POST", `/agent-actions/${encodeURIComponent(id)}/dismiss`, AgentResultSchema),
+    },
     demo: {
+      fastForward: (dealId: string, what: "release" | "renewal") =>
+        call("POST", "/demo/fast-forward", FastForwardResultSchema, { dealId, what }),
       refund: (milestoneId: string) =>
         call("POST", "/demo/refund", RefundResultSchema, { milestoneId }),
     },

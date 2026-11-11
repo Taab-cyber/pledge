@@ -249,6 +249,20 @@ export function DealView() {
               </p>
             )}
 
+            {isClient && m.status === "hold_at_risk" && (
+              <button
+                className={`${btn} bg-[#0B6E5B] text-white`}
+                disabled={busy}
+                onClick={() =>
+                  act("Old hold released. Secure the milestone again below.", () =>
+                    api.milestones.resecure(m.id),
+                  )
+                }
+              >
+                Secure again with a new hold
+              </button>
+            )}
+
             {/* Client: secure with PayPal (hold, not charged yet) */}
             {isClient && m.status === "awaiting_hold" && config?.paypalClientId && (
               <div className="flex flex-col gap-2">
@@ -345,6 +359,37 @@ export function DealView() {
           </li>
         ))}
       </ol>
+
+      {deal.demoMode && (
+        <section className="flex flex-col gap-2 rounded-2xl border border-dashed border-[#8A4B00] bg-[#FFF6E6] p-3 text-sm text-[#8A4B00]">
+          <strong>Demo controls (time is simulated; PayPal calls are real)</strong>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className={`${btn} border border-[#8A4B00]`}
+              disabled={busy}
+              onClick={() =>
+                act("Skipped 3 days: the auto-release ran and PayPal captured the payment.", () =>
+                  api.demo.fastForward(deal.id, "release"),
+                )
+              }
+            >
+              Demo: skip 3 days
+            </button>
+            <button
+              className={`${btn} border border-[#8A4B00]`}
+              disabled={busy}
+              onClick={() =>
+                act(
+                  "Skipped the 3-day honor period: the tick asked PayPal to renew the hold.",
+                  () => api.demo.fastForward(deal.id, "renewal"),
+                )
+              }
+            >
+              Demo: test hold renewal
+            </button>
+          </div>
+        </section>
+      )}
 
       <AgentFeed deal={deal} run={act} />
       <MessageBox deal={deal} run={act} />

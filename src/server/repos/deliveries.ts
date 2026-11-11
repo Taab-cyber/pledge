@@ -165,3 +165,27 @@ export async function resolveAgentAction(
     throw new AppError("INTERNAL", "Could not update the agent proposal.", { db: error.code });
   return data ? AgentActionRowSchema.parse(data) : null;
 }
+
+/** Conditional status move for agent actions (e.g. approved → executed, or back to proposed on failure). */
+export async function moveAgentAction(
+  admin: SupabaseClient,
+  id: string,
+  from: AgentActionRow["status"],
+  to: AgentActionRow["status"],
+  detail?: Record<string, unknown>,
+): Promise<boolean> {
+  const patch: Record<string, unknown> = {
+    status: to,
+    resolved_at: to === "proposed" ? null : new Date().toISOString(),
+  };
+  if (detail) patch.detail = detail;
+  const { data, error } = await admin
+    .from("agent_actions")
+    .update(patch)
+    .eq("id", id)
+    .eq("status", from)
+    .select("id");
+  if (error)
+    throw new AppError("INTERNAL", "Could not update the agent proposal.", { db: error.code });
+  return (data ?? []).length > 0;
+}

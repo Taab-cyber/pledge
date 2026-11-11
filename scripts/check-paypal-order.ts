@@ -58,3 +58,5 @@ main().catch((err: unknown) => {
   if (details) console.error("details:", JSON.stringify(details).slice(0, 800));
   process.exit(1);
 });
+
+export {};
