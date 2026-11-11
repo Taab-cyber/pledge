@@ -1,3 +1,3 @@
-export function GET() {
-  return Response.json({ ok: true });
-}
+import { route } from "@/server/http/route";
+
+export const GET = route(async () => ({ ok: true }));

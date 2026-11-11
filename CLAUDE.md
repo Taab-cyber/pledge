@@ -15,7 +15,23 @@ Deadline: Devpost, Nov 12 2026 12:00 PM PT. Our target: Nov 12, 9:00 PM IST.
 ## Current phase
 
 - Phase 0 — Skeleton: **done**
-- Next: Phase 1 — Database, auth, security base (needs Supabase credentials)
+- Phase 1 — Database, auth, security base: **done** (OTP login still to be confirmed by the user)
+- Next: Phase 2 — Domain core (money, currencies, allocate(), state machines). No credentials needed.
+
+## Supabase
+
+- Project `pledge`, ref `lzpuygnsyjzjwqhzkmwn`, region ap-south-1 (Mumbai), free plan, org "vaibhavv-ux's Org".
+- Managed through the Supabase MCP connector (apply_migration / execute_sql / get_advisors). Keep each
+  migration also saved in `supabase/migrations/` with the same SQL.
+- RLS model: `authenticated` can SELECT own rows only; the only user write is their own profile
+  (columns role/full_name/profession/country_code/paypal_email; role fixed once set by trigger).
+  Every other write goes through services using `adminClient()` (service role). RLS helpers live in
+  schema `private` (not exposed by the API).
+- RLS isolation check: run `supabase/tests/rls_isolation.sql` via execute_sql (rolls back; all rows should be `true`).
+- Rows are validated with zod in repos instead of generated DB types.
+- Email OTP: the "Magic Link" email template must include `{{ .Token }}` for the code login to work.
+  Supabase's built-in email only sends to org members and is heavily rate-limited; add custom SMTP before
+  real users / judges (judges use demo email+password accounts in Phase 7).
 
 ## Stack (don't change without asking)
 
@@ -44,15 +60,17 @@ src/
     services/        # use-cases (createDeal, buildPlan, secureMilestone, approveDelivery, tick…)
     repos/           # Supabase queries
     providers/       # payments/{paypal,mock} · ai/{anthropic,mock,prompts} · fx/{ecb,mock}
-    http/            # auth guard, error mapper, request id, rate limit
+    http/            # route() wrapper, AppError + error mapper, request id, requireUser() guard
     env.ts           # zod-validated env; env(), requireEnv()
   app/
-    (ui)/            # UI pages; import only from src/sdk
-    api/v1/…         # thin route handlers: parse → service → respond
+    (ui)/            # UI pages (login, me); import only from src/sdk
+    api/v1/…         # thin route handlers: parse → service → respond (health, me)
     api/webhooks/paypal, api/jobs/tick   # added in phases 4 / 6
-  sdk/               # typed fetch client for /api/v1 (types from zod schemas)
+  sdk/               # schemas.ts (zod API contracts, shared with server), client.ts (typed fetch),
+                     # browser.ts (api + supabaseBrowser for UI)
   instrumentation.ts # validates env at server boot
-supabase/migrations/
+supabase/migrations/ # same SQL as applied via the MCP connector
+supabase/tests/      # SQL checks (RLS isolation)
 docs/                # DEMO.md (phase 4+)
 ```
 
