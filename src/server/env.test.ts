@@ -26,10 +26,10 @@ describe("parseServerEnv", () => {
     expect(() => parseServerEnv({ PAYPAL_ENV: "live" })).toThrow(/PAYPAL_ENV/);
   });
 
-  it("requires an Anthropic key when the Anthropic provider is chosen", () => {
-    expect(() => parseServerEnv({ AI_PROVIDER: "anthropic" })).toThrow(/ANTHROPIC_API_KEY/);
-    expect(parseServerEnv({ AI_PROVIDER: "anthropic", ANTHROPIC_API_KEY: "k" }).AI_PROVIDER).toBe(
-      "anthropic",
+  it("requires a Gemini key when the Gemini provider is chosen", () => {
+    expect(() => parseServerEnv({ AI_PROVIDER: "gemini" })).toThrow(/GEMINI_API_KEY/);
+    expect(parseServerEnv({ AI_PROVIDER: "gemini", GEMINI_API_KEY: "k" }).AI_PROVIDER).toBe(
+      "gemini",
     );
   });
 

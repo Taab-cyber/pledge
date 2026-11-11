@@ -15,8 +15,11 @@ const serverEnvSchema = z
     NEXT_PUBLIC_SUPABASE_ANON_KEY: optional(z.string()),
     SUPABASE_SERVICE_ROLE_KEY: optional(z.string()),
 
-    AI_PROVIDER: z.preprocess(blankToUndefined, z.enum(["anthropic", "mock"]).default("mock")),
-    ANTHROPIC_API_KEY: optional(z.string()),
+    AI_PROVIDER: z.preprocess(blankToUndefined, z.enum(["gemini", "mock"]).default("mock")),
+    GEMINI_API_KEY: optional(z.string()),
+    // Vision-capable model for plans; fast model for checks. Free-tier models (Nov 2026).
+    GEMINI_MODEL: z.preprocess(blankToUndefined, z.string().default("gemini-3.6-flash")),
+    GEMINI_FAST_MODEL: z.preprocess(blankToUndefined, z.string().default("gemini-3.5-flash-lite")),
 
     PAYPAL_ENV: z.preprocess(blankToUndefined, z.literal("sandbox").default("sandbox")),
     PAYPAL_CLIENT_ID: optional(z.string()),
@@ -28,11 +31,11 @@ const serverEnvSchema = z
     DEMO_MODE: z.preprocess(blankToUndefined, z.stringbool().default(false)),
   })
   .superRefine((env, ctx) => {
-    if (env.AI_PROVIDER === "anthropic" && !env.ANTHROPIC_API_KEY) {
+    if (env.AI_PROVIDER === "gemini" && !env.GEMINI_API_KEY) {
       ctx.addIssue({
         code: "custom",
-        path: ["ANTHROPIC_API_KEY"],
-        message: "ANTHROPIC_API_KEY is required when AI_PROVIDER=anthropic",
+        path: ["GEMINI_API_KEY"],
+        message: "GEMINI_API_KEY is required when AI_PROVIDER=gemini",
       });
     }
   });

@@ -17,7 +17,28 @@ Deadline: Devpost, Nov 12 2026 12:00 PM PT. Our target: Nov 12, 9:00 PM IST.
 - Phase 0 — Skeleton: **done**
 - Phase 1 — Database, auth, security base: **done** (OTP login confirmed working)
 - Phase 2 — Domain core: **done**
-- Next: Phase 3 — Deals API + AI plan. Needs `SUPABASE_SERVICE_ROLE_KEY` in .env.local and an AI key.
+- Phase 3 — Deals API + AI plan: **done** (end-to-end test passes with real Gemini)
+- Next: Phase 4 — PayPal holds, capture, void, webhooks; deploy to Vercel. Needs PayPal sandbox app + accounts.
+
+## Deals API (Phase 3)
+
+| Route                                      | Who                | What                                            |
+| ------------------------------------------ | ------------------ | ----------------------------------------------- |
+| `GET/POST /api/v1/deals`                   | freelancer / party | list · create (JSON or multipart + screenshots) |
+| `GET /api/v1/deals/:id`                    | party (RLS)        | deal view with plan, sum check, issues          |
+| `POST /api/v1/deals/:id/plan`              | freelancer         | build plan with AI (weights → allocate())       |
+| `PUT /api/v1/deals/:id/plan`               | freelancer         | save edits (shared → back to draft)             |
+| `POST /api/v1/deals/:id/share`             | freelancer         | new version + rotated link + wa.me URL          |
+| `GET /api/v1/public/plans/:token`          | anyone             | redacted latest shared version                  |
+| `POST /api/v1/public/plans/:token/changes` | anyone             | suggestion; AI summarises it                    |
+| `POST /api/v1/public/plans/:token/approve` | signed-in client   | consent + approve exact version                 |
+
+- Share links rotate on every share (only the hash is stored), so old links stop working.
+- AI: `AI_PROVIDER=gemini` (free tier). `GEMINI_MODEL` default `gemini-3.6-flash` (plans, vision),
+  `GEMINI_FAST_MODEL` default `gemini-3.5-flash-lite`. Every call logged in `ai_runs`; 30/user/hour.
+  Free-tier prompts may be used by Google: demo data only.
+- End-to-end test: `npm run test:integration` (real DB + configured AI; cleans up after itself).
+- Demo chat image: `node scripts/make-demo-chat.mjs` → `docs/demo/chat-riya-daniel.png`.
 
 ## Domain modules (src/server/domain, pure, fully unit-tested)
 
@@ -40,14 +61,22 @@ renewed, resecure, void. A failed renewal can hit held / delivered / changes_req
 
 ## Supabase
 
-- Project `pledge`, ref `lzpuygnsyjzjwqhzkmwn`, region ap-south-1 (Mumbai), free plan, org "vaibhavv-ux's Org".
-- Managed through the Supabase MCP connector (apply_migration / execute_sql / get_advisors). Keep each
-  migration also saved in `supabase/migrations/` with the same SQL.
+- Project `pledge`, ref `hlfxxxnyfazgafnhgmdo`, org **"Mehtaab's Org"** (the user's own). Use only this one.
+  (An older project `lzpuygnsyjzjwqhzkmwn` in "vaibhavv-ux's Org" is NOT used; the Supabase MCP connector
+  is signed in to that other account, so don't use the connector for this project.)
+- Applying migrations: `npm run db:migrate` if `SUPABASE_DB_URL` is set in .env.local; otherwise paste the
+  new migration file into the dashboard SQL Editor (each migration file also inserts its own row into
+  `private.schema_migrations`). All files in `supabase/migrations/` up to `20261111220000` are applied.
+- The SQL Editor warns about "destructive operations" for `delete`/`revoke` inside functions; expected.
 - RLS model: `authenticated` can SELECT own rows only; the only user write is their own profile
   (columns role/full_name/profession/country_code/paypal_email; role fixed once set by trigger).
   Every other write goes through services using `adminClient()` (service role). RLS helpers live in
   schema `private` (not exposed by the API).
-- RLS isolation check: run `supabase/tests/rls_isolation.sql` via execute_sql (rolls back; all rows should be `true`).
+- RLS isolation check: `supabase/tests/rls_isolation.sql` (rolls back; every row should be `true`).
+  In the SQL Editor, end with a `raise exception` carrying the results instead of `rollback` to see them.
+- `events` is append-only (direct UPDATE/DELETE raise), but cascades from deleting a deal/user are allowed.
+- DB functions `replace_plan`, `share_deal`, `approve_deal` do plan writes atomically; service_role only.
+- Storage: private bucket `deal-inputs`; screenshots at `<dealId>/source/<n>.<ext>`.
 - Rows are validated with zod in repos instead of generated DB types.
 - Email OTP: the "Magic Link" email template must include `{{ .Token }}` for the code login to work.
   Supabase's built-in email only sends to org members and is heavily rate-limited; add custom SMTP before
@@ -109,6 +138,7 @@ docs/                # DEMO.md (phase 4+)
 
 ## Open decisions
 
-- AI provider/key: ask at Phase 3 (default assumption: Anthropic).
+- AI provider: Gemini free tier (user's choice). No Anthropic adapter yet; add one behind `AIProvider` if needed.
+- Vercel limits request bodies to ~4.5 MB: big screenshot sets may need direct-to-storage signed uploads later.
 - Total limit is 10 000 major units in every currency (per brief), so JPY deals cap at ¥10 000 (~$65).
 - PayPal reauthorization limits: read current docs in Phase 4 and note them here.

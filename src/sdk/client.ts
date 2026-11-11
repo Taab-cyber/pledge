@@ -1,6 +1,18 @@
 // Small typed client for /api/v1. Every response is validated against its zod schema.
 import type { z } from "zod";
-import { ErrorBodySchema, MeResponseSchema, type UpdateMeInput } from "./schemas";
+import {
+  ApprovePlanResultSchema,
+  DealDtoSchema,
+  DealListSchema,
+  ErrorBodySchema,
+  MeResponseSchema,
+  PublicPlanSchema,
+  ShareResultSchema,
+  SuggestChangeResultSchema,
+  type CreateDealInput,
+  type EditPlanInput,
+  type UpdateMeInput,
+} from "./schemas";
 
 export class ApiError extends Error {
   constructor(
@@ -35,12 +47,13 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     const headers: Record<string, string> = { accept: "application/json" };
     const token = await opts.getAccessToken?.();
     if (token) headers.authorization = `Bearer ${token}`;
-    if (body !== undefined) headers["content-type"] = "application/json";
+    const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+    if (body !== undefined && !isForm) headers["content-type"] = "application/json";
 
     const res = await doFetch(`${base}/api/v1${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
       credentials: "same-origin",
     });
     const json: unknown = await res.json().catch(() => null);
@@ -59,6 +72,44 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     me: {
       get: () => call("GET", "/me", MeResponseSchema),
       update: (input: UpdateMeInput) => call("PATCH", "/me", MeResponseSchema, input),
+    },
+    deals: {
+      list: () => call("GET", "/deals", DealListSchema),
+      get: (id: string) => call("GET", `/deals/${encodeURIComponent(id)}`, DealDtoSchema),
+      /** Screenshots are sent as multipart; without them the body is plain JSON. */
+      create: (input: CreateDealInput, screenshots: Blob[] = []) => {
+        if (screenshots.length === 0) return call("POST", "/deals", DealDtoSchema, input);
+        const form = new FormData();
+        form.set("data", JSON.stringify(input));
+        screenshots.forEach((s, i) =>
+          form.append("screenshots", s, s instanceof File ? s.name : `screenshot-${i + 1}`),
+        );
+        return call("POST", "/deals", DealDtoSchema, form);
+      },
+      buildPlan: (id: string) =>
+        call("POST", `/deals/${encodeURIComponent(id)}/plan`, DealDtoSchema),
+      editPlan: (id: string, input: EditPlanInput) =>
+        call("PUT", `/deals/${encodeURIComponent(id)}/plan`, DealDtoSchema, input),
+      share: (id: string) =>
+        call("POST", `/deals/${encodeURIComponent(id)}/share`, ShareResultSchema),
+    },
+    publicPlans: {
+      get: (token: string) =>
+        call("GET", `/public/plans/${encodeURIComponent(token)}`, PublicPlanSchema),
+      suggestChange: (token: string, text: string) =>
+        call(
+          "POST",
+          `/public/plans/${encodeURIComponent(token)}/changes`,
+          SuggestChangeResultSchema,
+          { text },
+        ),
+      approve: (token: string, version: number) =>
+        call(
+          "POST",
+          `/public/plans/${encodeURIComponent(token)}/approve`,
+          ApprovePlanResultSchema,
+          { version, consent: true },
+        ),
     },
   };
 }

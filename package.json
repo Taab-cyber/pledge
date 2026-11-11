@@ -12,7 +12,11 @@
     "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run lint && npm run typecheck && npm run test"
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "db:migrate": "node scripts/db.mjs migrate",
+    "db:status": "node scripts/db.mjs status",
+    "db:test-rls": "node scripts/db.mjs sql supabase/tests/rls_isolation.sql",
+    "test:integration": "vitest run src/server/services/flow.integration.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -20,16 +24,19 @@
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "sharp": "^0.35.5",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "eslint-config-prettier": "^10.1.8",
+    "pg": "^8.23.1",
     "prettier": "^3.9.10",
     "tailwindcss": "4.3.3",
     "typescript": "^5",

@@ -131,10 +131,12 @@ describe("useRevision", () => {
 });
 
 describe("deal transitions", () => {
-  const EVENTS: DealEvent[] = ["share", "approve", "first_hold", "complete", "cancel"];
+  const EVENTS: DealEvent[] = ["edit", "share", "approve", "first_hold", "complete", "cancel"];
   const LEGAL_DEAL: Record<string, DealStatus> = {
+    "draft:edit": "draft",
     "draft:share": "shared",
     "draft:cancel": "cancelled",
+    "shared:edit": "draft",
     "shared:share": "shared",
     "shared:approve": "approved",
     "shared:cancel": "cancelled",

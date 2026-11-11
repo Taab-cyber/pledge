@@ -12,15 +12,16 @@ export const DEAL_STATUSES = [
 export type DealStatus = (typeof DEAL_STATUSES)[number];
 
 export type DealEvent =
-  | "share" //          freelancer creates the WhatsApp link
+  | "edit" //           freelancer saves plan changes (a shared plan goes back to draft until re-shared)
+  | "share" //          freelancer snapshots a new version and creates the WhatsApp link
   | "approve" //        client approves the current version (+ consent)
   | "first_hold" //     first milestone secured
   | "complete" //       every milestone released or voided
   | "cancel";
 
 const TRANSITIONS: Record<DealStatus, Partial<Record<DealEvent, DealStatus>>> = {
-  draft: { share: "shared", cancel: "cancelled" },
-  shared: { share: "shared", approve: "approved", cancel: "cancelled" },
+  draft: { edit: "draft", share: "shared", cancel: "cancelled" },
+  shared: { edit: "draft", share: "shared", approve: "approved", cancel: "cancelled" },
   approved: { first_hold: "active", cancel: "cancelled" },
   active: { complete: "completed", cancel: "cancelled" },
   completed: {},
