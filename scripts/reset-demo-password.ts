@@ -6,7 +6,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 process.loadEnvFile(".env.local");
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-const password = "Pledge" + Array.from({ length: 12 }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
+const password =
+  "Pledge" + Array.from({ length: 12 }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
 
 async function main() {
   const { adminClient } = await import("../src/server/repos/supabase");
@@ -24,7 +25,9 @@ async function main() {
   env = env.replace(/^DEMO_PASSWORD=.*$/m, `DEMO_PASSWORD=${password}`);
   writeFileSync(".env.local", env);
   const line = env.split("\n").findIndex((l) => l.startsWith("DEMO_PASSWORD=")) + 1;
-  console.log(`New demo password saved on line ${line} of .env.local (${password.length} characters, letters and digits only).`);
+  console.log(
+    `New demo password saved on line ${line} of .env.local (${password.length} characters, letters and digits only).`,
+  );
 }
 main().catch((e) => {
   console.error(e instanceof Error ? e.message : e);
