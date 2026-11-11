@@ -83,12 +83,19 @@ export type MilestoneRow = z.input<typeof MilestoneRowSchema>;
 
 const ChangeRequestRowSchema = z.object({
   id: z.uuid(),
+  kind: z.enum(["suggestion", "revision", "message"]).default("suggestion"),
+  milestone_id: z.uuid().nullable().default(null),
   from_role: z.enum(["freelancer", "client"]),
   text: z.string(),
-  ai_summary: z.object({ changes: z.array(z.string()) }).nullable(),
+  ai_summary: z
+    .object({
+      changes: z.array(z.string()).optional(),
+      scope: z.object({ inScope: z.boolean(), reason: z.string() }).optional(),
+    })
+    .nullable(),
   created_at: z.string(),
 });
-export type ChangeRequestRow = z.infer<typeof ChangeRequestRowSchema>;
+export type ChangeRequestRow = z.input<typeof ChangeRequestRowSchema>;
 
 export const SnapshotSchema = z.object({
   title: z.string(),
@@ -195,7 +202,7 @@ export async function listChangeRequests(
 ): Promise<ChangeRequestRow[]> {
   const { data, error } = await db
     .from("change_requests")
-    .select("id, from_role, text, ai_summary, created_at")
+    .select("id, kind, milestone_id, from_role, text, ai_summary, created_at")
     .eq("deal_id", dealId)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -219,16 +226,31 @@ export async function countRecentChangeRequests(
 
 export async function insertChangeRequest(
   admin: SupabaseClient,
-  row: { deal_id: string; from_role: "client" | "freelancer"; text: string; ai_summary: unknown },
-) {
-  const { error } = await admin.from("change_requests").insert(row);
-  if (error) throw dbError("save the suggestion", error);
+  row: {
+    deal_id: string;
+    from_role: "client" | "freelancer";
+    text: string;
+    ai_summary: unknown;
+    milestone_id?: string | null;
+    kind?: "suggestion" | "revision" | "message";
+  },
+): Promise<string> {
+  const { data, error } = await admin.from("change_requests").insert(row).select("id").single();
+  if (error) throw dbError("save the message", error);
+  const kind = row.kind ?? "suggestion";
   await admin.from("events").insert({
     deal_id: row.deal_id,
+    milestone_id: row.milestone_id ?? null,
     actor_role: row.from_role,
-    type: "change_suggested",
+    type:
+      kind === "revision"
+        ? "changes_requested"
+        : kind === "message"
+          ? "message_sent"
+          : "change_suggested",
     payload: {},
   });
+  return (data as { id: string }).id;
 }
 
 export async function getVersionSnapshot(

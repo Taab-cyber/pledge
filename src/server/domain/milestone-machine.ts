@@ -93,7 +93,7 @@ export type RevisionOutcome =
   | { allowed: false; reason: "REVISIONS_USED_UP"; suggestAddon: true };
 
 /** A change request uses one revision round; past the included rounds, suggest a paid add-on. */
-export function useRevision(revisionsIncluded: number, revisionsUsed: number): RevisionOutcome {
+export function consumeRevision(revisionsIncluded: number, revisionsUsed: number): RevisionOutcome {
   if (revisionsUsed >= revisionsIncluded) {
     return { allowed: false, reason: "REVISIONS_USED_UP", suggestAddon: true };
   }

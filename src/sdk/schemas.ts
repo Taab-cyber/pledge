@@ -141,6 +141,7 @@ export const MilestoneDtoSchema = z.object({
   revisionsUsed: z.int(),
   status: z.enum(MILESTONE_STATUSES),
   todos: z.array(TodoDtoSchema),
+  delivery: z.lazy(() => DeliveryDtoSchema).nullable(),
   payment: z.object({
     dueDate: z.string().nullable(),
     /** PayPal authorization id while a hold exists (shown for the sandbox split-screen). */
@@ -203,11 +204,61 @@ export const PlanIssueDtoSchema = z.object({
 
 export const ChangeRequestDtoSchema = z.object({
   id: z.uuid(),
+  kind: z.enum(["suggestion", "revision", "message"]),
+  milestoneId: z.uuid().nullable(),
   fromRole: z.enum(["freelancer", "client"]),
   text: z.string(),
   aiChanges: z.array(z.string()).nullable(),
+  /** Scope guard verdict for client messages. */
+  scope: z.object({ inScope: z.boolean(), reason: z.string() }).nullable(),
   createdAt: z.string(),
 });
+
+export const CheckItemSchema = z.object({
+  todo: z.string(),
+  status: z.enum(["met", "missing", "unclear"]),
+  reason: z.string(),
+});
+export const DeliveryCheckDtoSchema = z.object({
+  items: z.array(CheckItemSchema),
+  summary: z.string(),
+  verdict: z.enum(["met", "missing", "unclear"]),
+});
+export type DeliveryCheckDto = z.infer<typeof DeliveryCheckDtoSchema>;
+
+export const DeliveryDtoSchema = z.object({
+  round: z.int(),
+  note: z.string(),
+  createdAt: z.string(),
+  files: z.array(
+    z.object({
+      index: z.int(),
+      name: z.string(),
+      mime: z.string(),
+      size: z.int(),
+      /** Watermarked preview (signed, ~10 min); null for non-images. */
+      previewUrl: z.string().nullable(),
+      /** True when this viewer may download the original now. */
+      originalAvailable: z.boolean(),
+    }),
+  ),
+  aiCheck: DeliveryCheckDtoSchema.nullable(),
+});
+
+export const AgentActionDtoSchema = z.object({
+  id: z.uuid(),
+  kind: z.string(),
+  title: z.string(),
+  status: z.enum(["proposed", "approved", "executed", "dismissed", "auto_executed"]),
+  /** Who should act on it: the client, the freelancer, or nobody (informational). */
+  for: z.enum(["client", "freelancer", "both", "none"]),
+  noticed: z.string().nullable(),
+  wants: z.string().nullable(),
+  milestoneId: z.uuid().nullable(),
+  detail: z.record(z.string(), z.unknown()),
+  createdAt: z.string(),
+});
+export type AgentActionDto = z.infer<typeof AgentActionDtoSchema>;
 
 export const DealDtoSchema = z.object({
   id: z.uuid(),
@@ -235,6 +286,7 @@ export const DealDtoSchema = z.object({
     client: EstimateDtoSchema.nullable(),
   }),
   demoMode: z.boolean(),
+  agentActions: z.array(z.lazy(() => AgentActionDtoSchema)),
   createdAt: z.string(),
 });
 export type DealDto = z.infer<typeof DealDtoSchema>;
@@ -336,3 +388,65 @@ export const AppConfigSchema = z.object({
   paypalClientId: z.string().nullable(),
 });
 export type AppConfig = z.infer<typeof AppConfigSchema>;
+
+// ── Deliveries, revisions, scope guard, add-ons (Phase 5) ────────────────────
+
+const uploadedFile = z.object({
+  path: z.string().min(1).max(400),
+  name: z.string().trim().min(1).max(200),
+});
+
+export const UploadSlotsInputSchema = z
+  .object({
+    files: z
+      .array(z.object({ name: z.string().trim().min(1).max(200), size: z.int().min(1) }))
+      .min(1)
+      .max(10),
+  })
+  .strict();
+export const UploadSlotsResultSchema = z.object({
+  slots: z.array(
+    z.object({ name: z.string(), path: z.string(), token: z.string(), signedUrl: z.string() }),
+  ),
+});
+export const DeliveryInputSchema = z
+  .object({
+    note: z.string().trim().max(5000).default(""),
+    files: z.array(uploadedFile).max(10).default([]),
+  })
+  .strict();
+export const CheckDeliveryResultSchema = z.object({ check: DeliveryCheckDtoSchema });
+export const DeliverResultSchema = z.object({
+  status: z.literal("delivered"),
+  round: z.int(),
+  releaseAt: z.string().nullable(),
+  aiCheck: DeliveryCheckDtoSchema.nullable(),
+});
+export const RequestChangesInputSchema = z
+  .object({ text: z.string().trim().min(1).max(2000) })
+  .strict();
+export const RequestChangesResultSchema = z.object({
+  status: z.literal("changes_requested"),
+  revisionsLeft: z.int(),
+});
+export const TodoInputSchema = z.object({ done: z.boolean() }).strict();
+export const MessageInputSchema = z.object({ text: z.string().trim().min(1).max(2000) }).strict();
+export const MessageResultSchema = z.object({
+  inScope: z.boolean(),
+  reason: z.string(),
+  proposal: z.object({ id: z.uuid(), title: z.string() }).nullable(),
+});
+export const AddonInputSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    todos: z.array(z.string().trim().min(1).max(300)).min(1).max(20),
+    amountMajor: z
+      .union([z.string(), z.number()])
+      .transform((v) => String(v).trim())
+      .pipe(z.string().regex(/^d+(.d+)?$/, "Use a plain amount like 60 or 60.50")),
+    dueInDays: z.int().min(1).max(21),
+    actionId: z.uuid().optional(),
+  })
+  .strict();
+export const AddonResultSchema = z.object({ addonId: z.uuid(), status: z.literal("draft") });
+export const AddonResponseInputSchema = z.object({ accept: z.boolean() }).strict();

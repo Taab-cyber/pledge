@@ -7,6 +7,16 @@ import {
   buildPlanUserText,
 } from "../prompts/build-plan";
 import {
+  CHECK_DELIVERY_PROMPT_VERSION,
+  CHECK_DELIVERY_SYSTEM,
+  checkDeliveryUserText,
+} from "../prompts/check-delivery";
+import {
+  CLASSIFY_REQUEST_PROMPT_VERSION,
+  CLASSIFY_REQUEST_SYSTEM,
+  classifyRequestUserText,
+} from "../prompts/classify-request";
+import {
   SUMMARIZE_CHANGES_PROMPT_VERSION,
   SUMMARIZE_CHANGES_SYSTEM,
   summarizeChangesUserText,
@@ -14,7 +24,9 @@ import {
 import { jsonSchemaFor, runStructured, type ModelReply, type ModelTurn } from "../structured";
 import {
   ChangeSummarySchema,
+  DeliveryCheckSchema,
   PlanDraftSchema,
+  ScopeResultSchema,
   type AIProvider,
   type AIProviderOptions,
   type ImageInput,
@@ -147,6 +159,31 @@ export function createGeminiProvider(cfg: GeminiConfig, opts: AIProviderOptions 
         schema: ChangeSummarySchema,
         call: (extra) =>
           generate(cfg.fastModel, SUMMARIZE_CHANGES_SYSTEM, parts, ChangeSummarySchema, extra),
+        onRun: opts.onRun,
+      });
+    },
+
+    checkDelivery(i) {
+      // Vision model: thumbnails let it see e.g. whether a dark-background version exists.
+      const parts: Part[] = [{ text: checkDeliveryUserText(i) }, ...i.thumbnails.map(imagePart)];
+      return runStructured({
+        task: CHECK_DELIVERY_PROMPT_VERSION,
+        model: cfg.model,
+        schema: DeliveryCheckSchema,
+        call: (extra) =>
+          generate(cfg.model, CHECK_DELIVERY_SYSTEM, parts, DeliveryCheckSchema, extra),
+        onRun: opts.onRun,
+      });
+    },
+
+    classifyRequest(i) {
+      const parts: Part[] = [{ text: classifyRequestUserText(i) }];
+      return runStructured({
+        task: CLASSIFY_REQUEST_PROMPT_VERSION,
+        model: cfg.fastModel,
+        schema: ScopeResultSchema,
+        call: (extra) =>
+          generate(cfg.fastModel, CLASSIFY_REQUEST_SYSTEM, parts, ScopeResultSchema, extra),
         onRun: opts.onRun,
       });
     },

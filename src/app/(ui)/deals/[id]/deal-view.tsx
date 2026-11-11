@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type AppConfig, type DealDto, type MilestoneDto } from "@/sdk/browser";
+import { AgentFeed, MessageBox } from "./agent-feed";
+import { DeliveryForm, DeliveryView, RequestChanges } from "./delivery-panel";
 import { PayPalHoldButtons } from "./paypal-buttons";
 
 const STATUS_TEXT: Record<MilestoneDto["status"], string> = {
@@ -133,18 +135,69 @@ export function DealView() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-semibold">
-                  {m.position + 1}. {m.title}
+                  {m.kind === "addon" ? "Add-on" : `${m.position + 1}.`} {m.title}
                 </h2>
                 <p className="text-sm">{STATUS_TEXT[m.status]}</p>
               </div>
               <strong>{m.amount.formatted}</strong>
             </div>
 
-            <ul className="list-disc pl-5 text-sm">
+            <ul className="flex flex-col gap-1 text-sm">
               {m.todos.map((t) => (
-                <li key={t.id}>{t.label}</li>
+                <li key={t.id}>
+                  {!isClient && ["held", "changes_requested", "delivered"].includes(m.status) ? (
+                    <label className="flex min-h-11 items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={t.done}
+                        onChange={(e) =>
+                          act(e.target.checked ? "To-do ticked." : "To-do unticked.", () =>
+                            api.todos.set(t.id, e.target.checked),
+                          )
+                        }
+                      />
+                      {t.label}
+                    </label>
+                  ) : (
+                    <span>
+                      {t.done ? "☑" : "☐"} {t.label}
+                    </span>
+                  )}
+                </li>
               ))}
             </ul>
+
+            <DeliveryView
+              milestone={m}
+              isClient={isClient}
+              onError={(text) => setMessage({ kind: "error", text })}
+            />
+
+            {/* Client: answer an offered add-on (it then gets its own PayPal hold) */}
+            {isClient && m.kind === "addon" && m.status === "draft" && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className={`${btn} bg-[#0B6E5B] text-white`}
+                  disabled={busy}
+                  onClick={() =>
+                    act("Add-on accepted. Secure it with PayPal below.", () =>
+                      api.milestones.respondToAddon(m.id, true),
+                    )
+                  }
+                >
+                  Accept add-on
+                </button>
+                <button
+                  className={`${btn} border border-neutral-400 text-neutral-800`}
+                  disabled={busy}
+                  onClick={() =>
+                    act("Add-on declined.", () => api.milestones.respondToAddon(m.id, false))
+                  }
+                >
+                  Decline
+                </button>
+              </div>
+            )}
 
             {(m.payment.authorizationId || m.payment.captureId) && (
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-lg bg-neutral-50 p-3 text-xs">
@@ -228,19 +281,16 @@ export function DealView() {
               </p>
             )}
 
-            {/* Freelancer: deliver (files + AI check arrive in Phase 5) */}
+            {/* Freelancer: deliver with files + AI pre-check */}
             {!isClient && (m.status === "held" || m.status === "changes_requested") && (
-              <button
-                className={`${btn} bg-[#0B6E5B] text-white`}
-                disabled={busy}
-                onClick={() =>
-                  act("Marked as delivered.", () =>
-                    api.milestones.deliver(m.id, "Delivered from the Phase 4 test page"),
-                  )
-                }
-              >
-                Mark delivered
-              </button>
+              <DeliveryForm
+                milestone={m}
+                onDone={(text) => {
+                  setMessage({ kind: "ok", text });
+                  void load();
+                }}
+                onError={(text) => setMessage({ kind: "error", text })}
+              />
             )}
 
             {/* Client: approve and pay (PayPal capture) */}
@@ -272,6 +322,16 @@ export function DealView() {
                 )}
               </div>
             )}
+            {isClient && m.status === "delivered" && (
+              <RequestChanges
+                milestone={m}
+                onDone={(text) => {
+                  setMessage({ kind: "ok", text });
+                  void load();
+                }}
+                onError={(text) => setMessage({ kind: "error", text })}
+              />
+            )}
 
             {!isClient && ["held", "hold_at_risk", "awaiting_hold"].includes(m.status) && (
               <button
@@ -285,6 +345,9 @@ export function DealView() {
           </li>
         ))}
       </ol>
+
+      <AgentFeed deal={deal} run={act} />
+      <MessageBox deal={deal} run={act} />
     </main>
   );
 }

@@ -39,7 +39,12 @@ export function toDealDto(
   milestones: MilestoneRow[],
   changes: ChangeRequestRow[],
   viewerId: string,
-  extras: { estimates?: DealDto["estimates"]; demoMode?: boolean } = {},
+  extras: {
+    estimates?: DealDto["estimates"];
+    demoMode?: boolean;
+    deliveries?: Map<string, NonNullable<DealDto["milestones"][number]["delivery"]>>;
+    agentActions?: DealDto["agentActions"];
+  } = {},
 ): DealDto {
   const viewerRole = deal.freelancer_id === viewerId ? "freelancer" : "client";
   const plan = milestones.filter((m) => m.kind === "milestone");
@@ -90,6 +95,7 @@ export function toDealDto(
       revisionsUsed: m.revisions_used,
       status: m.status,
       todos: m.todos.map((t) => ({ id: t.id, label: t.label, done: t.done })),
+      delivery: extras.deliveries?.get(m.id) ?? null,
       payment: paymentDto(m, deal.currency),
     })),
     sum: moneyDto(sumMinor, deal.currency),
@@ -98,14 +104,18 @@ export function toDealDto(
     canShare: plan.length > 0 && issues.length === 0,
     changeRequests: changes.map((c) => ({
       id: c.id,
+      kind: c.kind ?? "suggestion",
+      milestoneId: c.milestone_id ?? null,
       fromRole: c.from_role,
       text: c.text,
       aiChanges: c.ai_summary?.changes ?? null,
+      scope: c.ai_summary?.scope ?? null,
       createdAt: c.created_at,
     })),
     createdAt: deal.created_at,
     estimates: extras.estimates ?? { freelancer: null, client: null },
     demoMode: extras.demoMode ?? false,
+    agentActions: extras.agentActions ?? [],
   };
 }
 

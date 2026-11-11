@@ -84,11 +84,64 @@ export interface AiRunLog {
   ok: boolean;
 }
 
+export const DeliveryCheckSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        todo: z.string().min(1).max(300).describe("The to-do text, copied exactly"),
+        status: z.enum(["met", "missing", "unclear"]),
+        reason: z
+          .string()
+          .min(1)
+          .max(300)
+          .describe("What in the delivery shows this (or what's absent)"),
+      }),
+    )
+    .max(25),
+  summary: z.string().max(400).describe("One or two plain sentences for the client"),
+});
+export type DeliveryCheckOutput = z.infer<typeof DeliveryCheckSchema>;
+
+export interface CheckDeliveryInput {
+  milestoneTitle: string;
+  todos: string[];
+  note: string;
+  files: Array<{ name: string; mime: string; sizeBytes: number }>;
+  /** Small unwatermarked thumbnails of image files (never the originals). */
+  thumbnails: ImageInput[];
+}
+
+export const ScopeResultSchema = z.object({
+  inScope: z.boolean(),
+  reason: z.string().min(1).max(300),
+  suggestedAddon: z
+    .object({
+      title: z.string().min(1).max(120),
+      todos: z.array(z.string().min(1).max(200)).min(1).max(10),
+      weight: z
+        .int()
+        .min(1)
+        .max(100)
+        .describe("Workload compared with the WHOLE original deal (100 = as much work again)"),
+      dueInDays: z.int().min(1).max(21),
+    })
+    .nullable()
+    .describe("Only when out of scope: a paid add-on covering the extra work, else null"),
+});
+export type ScopeResult = z.infer<typeof ScopeResultSchema>;
+
+export interface ScopeInput {
+  dealTitle: string;
+  milestones: Array<{ title: string; todos: string[] }>;
+  message: string;
+}
+
 export interface AIProvider {
   readonly name: string;
   buildPlan(i: BuildPlanInput): Promise<PlanDraft>;
   summarizeChanges(i: SummarizeChangesInput): Promise<ChangeSummary>;
-  // checkDelivery and classifyRequest arrive in Phase 5.
+  checkDelivery(i: CheckDeliveryInput): Promise<DeliveryCheckOutput>;
+  classifyRequest(i: ScopeInput): Promise<ScopeResult>;
 }
 
 export interface AIProviderOptions {

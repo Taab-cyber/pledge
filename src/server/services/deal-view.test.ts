@@ -95,7 +95,17 @@ describe("sniffFileType", () => {
     expect(sniffFileType(jpg)?.mime).toBe("image/jpeg");
     expect(sniffFileType(webp)?.mime).toBe("image/webp");
     expect(sniffFileType(Buffer.from("MZ executable named photo.png"))).toBeNull();
-    expect(sniffFileType(Buffer.from("<svg onload=alert(1)>"))).toBeNull();
+    // SVGs are accepted as deliverables: originals are only served as downloads (attachment) and
+    // previews are rasterised to JPEG, so script inside an SVG never runs in the app.
+    expect(
+      sniffFileType(Buffer.from('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>'))
+        ?.mime,
+    ).toBe("image/svg+xml");
+    expect(sniffFileType(Buffer.from("<html><script>alert(1)</script></html>"))).toBeNull();
+    expect(sniffFileType(Buffer.from("<!-- svg --><div>not svg</div>"))).toBeNull();
+    expect(sniffFileType(Buffer.from([0x50, 0x4b, 0x03, 0x04, 0, 0]))?.mime).toBe(
+      "application/zip",
+    );
   });
 });
 
@@ -105,5 +115,26 @@ describe("rateLimit", () => {
     for (let i = 0; i < 3; i++) rateLimit("k", 3, 1000, 0);
     expect(() => rateLimit("k", 3, 1000, 10)).toThrow(/Too many/);
     expect(() => rateLimit("k", 3, 1000, 1000)).not.toThrow(); // new window
+  });
+});
+
+describe("watermarked previews", () => {
+  it("are smaller JPEGs and differ from the original image", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const { makePreview, makeThumbnail } = await import("./images");
+    const original = await sharpMod({
+      create: { width: 2400, height: 1600, channels: 3, background: "#ffffff" },
+    })
+      .png()
+      .toBuffer();
+    const preview = await makePreview(original, "image/png");
+    const meta = await sharpMod(preview).metadata();
+    expect(meta.format).toBe("jpeg");
+    expect(Math.max(meta.width ?? 0, meta.height ?? 0)).toBe(1200);
+    // A plain white image gets visibly darker pixels from the watermark.
+    const stats = await sharpMod(preview).stats();
+    expect(stats.channels[0]!.min).toBeLessThan(230);
+    const thumb = await sharpMod(await makeThumbnail(original, "image/png")).metadata();
+    expect(thumb.width).toBe(512);
   });
 });

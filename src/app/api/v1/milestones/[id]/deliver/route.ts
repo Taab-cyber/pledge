@@ -1,11 +1,10 @@
-import { DeliverInputSchema } from "@/sdk/schemas";
+import { DeliveryInputSchema } from "@/sdk/schemas";
 import { requireUser } from "@/server/http/auth";
 import { readJson, route } from "@/server/http/route";
-import { deliverMilestone } from "@/server/services/payments";
+import { deliverWork } from "@/server/services/deliveries";
 
-/** Freelancer: mark the work delivered (files and the AI check arrive in Phase 5). */
+/** Freelancer: submit the delivery (files already uploaded via /delivery/uploads). */
 export const POST = route<{ id: string }>(async (req, { params }) => {
   const auth = await requireUser(req);
-  const { note } = DeliverInputSchema.parse(await readJson(req));
-  return deliverMilestone(auth, params.id, note);
+  return deliverWork(auth, params.id, DeliveryInputSchema.parse(await readJson(req)));
 });

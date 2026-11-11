@@ -14,7 +14,7 @@ import {
   isDueForAutoRelease,
   isTerminal,
   transition,
-  useRevision,
+  consumeRevision,
   type MilestoneEvent,
   type MilestoneStatus,
 } from "./milestone-machine";
@@ -117,16 +117,16 @@ describe("auto-release", () => {
   });
 });
 
-describe("useRevision", () => {
+describe("consumeRevision", () => {
   it("counts rounds and suggests a paid add-on when they run out", () => {
-    expect(useRevision(2, 0)).toEqual({ allowed: true, revisionsUsed: 1, remaining: 1 });
-    expect(useRevision(2, 1)).toEqual({ allowed: true, revisionsUsed: 2, remaining: 0 });
-    expect(useRevision(2, 2)).toEqual({
+    expect(consumeRevision(2, 0)).toEqual({ allowed: true, revisionsUsed: 1, remaining: 1 });
+    expect(consumeRevision(2, 1)).toEqual({ allowed: true, revisionsUsed: 2, remaining: 0 });
+    expect(consumeRevision(2, 2)).toEqual({
       allowed: false,
       reason: "REVISIONS_USED_UP",
       suggestAddon: true,
     });
-    expect(useRevision(0, 0).allowed).toBe(false);
+    expect(consumeRevision(0, 0).allowed).toBe(false);
   });
 });
 

@@ -29,6 +29,8 @@ import { getProfile } from "../repos/profiles";
 import { downloadPrivate, removePrivate, uploadPrivate } from "../repos/storage";
 import { adminClient } from "../repos/supabase";
 import { aiFor, assertAiQuota } from "./ai";
+import { listAgentActions, latestDeliveries } from "../repos/deliveries";
+import { signedUrls } from "../repos/storage";
 import { moneyDto, toDealDto } from "./deal-view";
 import { estimate } from "./fx";
 
@@ -76,10 +78,85 @@ export async function getDeal(auth: AuthContext, dealId: string): Promise<DealDt
     estimate(total, deal.currency, freelancer.country_code),
     estimate(total, deal.currency, deal.client_country),
   ]);
+  const viewerRole = deal.freelancer_id === auth.userId ? "freelancer" : "client";
+  const [deliveries, agentActions] = await Promise.all([
+    deliveryDtos(auth, milestones, viewerRole),
+    agentFeed(auth, deal.id, viewerRole),
+  ]);
   return toDealDto(deal, milestones, changes, auth.userId, {
     estimates: { freelancer: forFreelancer, client: forClient },
     demoMode: env().DEMO_MODE,
+    deliveries,
+    agentActions,
   });
+}
+
+type DeliveryDto = NonNullable<DealDto["milestones"][number]["delivery"]>;
+
+/** Latest delivery per milestone; previews get short-lived signed links, originals only after payment. */
+async function deliveryDtos(
+  auth: AuthContext,
+  milestones: Awaited<ReturnType<typeof listMilestones>>,
+  viewerRole: "freelancer" | "client",
+): Promise<Map<string, DeliveryDto>> {
+  const latest = await latestDeliveries(
+    auth.db,
+    milestones.map((m) => m.id),
+  );
+  const previewPaths = [...latest.values()].flatMap((d) =>
+    d.files.map((f) => f.previewPath).filter((p): p is string => !!p),
+  );
+  const urls = await signedUrls(adminClient(), previewPaths, 600);
+  const out = new Map<string, DeliveryDto>();
+  for (const m of milestones) {
+    const d = latest.get(m.id);
+    if (!d) continue;
+    out.set(m.id, {
+      round: d.round,
+      note: d.note,
+      createdAt: d.created_at,
+      files: d.files.map((f, index) => ({
+        index,
+        name: f.name,
+        mime: f.mime,
+        size: f.size,
+        previewUrl: f.previewPath ? (urls.get(f.previewPath) ?? null) : null,
+        originalAvailable: viewerRole === "freelancer" || m.status === "released",
+      })),
+      aiCheck: d.ai_check
+        ? { items: d.ai_check.items, summary: d.ai_check.summary, verdict: d.ai_check.verdict }
+        : null,
+    });
+  }
+  return out;
+}
+
+/** Deal Agent feed, filtered to what this viewer should act on or see. */
+async function agentFeed(
+  auth: AuthContext,
+  dealId: string,
+  viewerRole: "freelancer" | "client",
+): Promise<DealDto["agentActions"]> {
+  const rows = await listAgentActions(auth.db, dealId);
+  return rows
+    .map((a) => {
+      const d = a.detail as { for?: string; noticed?: string; wants?: string };
+      const target =
+        (["client", "freelancer", "both", "none"] as const).find((x) => x === d.for) ?? "both";
+      return {
+        id: a.id,
+        kind: a.kind,
+        title: a.title,
+        status: a.status,
+        for: target,
+        noticed: d.noticed ?? null,
+        wants: d.wants ?? null,
+        milestoneId: a.milestone_id,
+        detail: a.detail,
+        createdAt: a.created_at,
+      };
+    })
+    .filter((a) => a.for === viewerRole || a.for === "both" || a.for === "none");
 }
 
 export async function listMyDeals(auth: AuthContext): Promise<DealList> {

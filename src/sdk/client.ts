@@ -1,7 +1,13 @@
 // Small typed client for /api/v1. Every response is validated against its zod schema.
-import type { z } from "zod";
+import { z } from "zod";
 import {
+  AddonResultSchema,
   AppConfigSchema,
+  CheckDeliveryResultSchema,
+  DeliverResultSchema,
+  MessageResultSchema,
+  RequestChangesResultSchema,
+  UploadSlotsResultSchema,
   ApprovePlanResultSchema,
   DealDtoSchema,
   DealListSchema,
@@ -17,6 +23,20 @@ import {
   type EditPlanInput,
   type UpdateMeInput,
 } from "./schemas";
+
+export interface DeliveryPayload {
+  note: string;
+  files: Array<{ path: string; name: string }>;
+}
+export interface AddonPayload {
+  title: string;
+  todos: string[];
+  amountMajor: string;
+  dueInDays: number;
+  actionId?: string;
+}
+const FileUrlSchema = z.object({ url: z.string() });
+const TodoResultSchema = z.object({ id: z.string(), done: z.boolean() });
 
 export class ApiError extends Error {
   constructor(
@@ -95,6 +115,10 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         call("POST", `/deals/${encodeURIComponent(id)}/plan`, DealDtoSchema),
       editPlan: (id: string, input: EditPlanInput) =>
         call("PUT", `/deals/${encodeURIComponent(id)}/plan`, DealDtoSchema, input),
+      message: (id: string, text: string) =>
+        call("POST", `/deals/${encodeURIComponent(id)}/messages`, MessageResultSchema, { text }),
+      proposeAddon: (id: string, input: AddonPayload) =>
+        call("POST", `/deals/${encodeURIComponent(id)}/addons`, AddonResultSchema, input),
       share: (id: string) =>
         call("POST", `/deals/${encodeURIComponent(id)}/share`, ShareResultSchema),
     },
@@ -112,9 +136,42 @@ export function createApiClient(opts: ApiClientOptions = {}) {
             orderId,
           },
         ),
-      deliver: (id: string, note = "") =>
-        call("POST", `/milestones/${encodeURIComponent(id)}/deliver`, MilestoneActionResultSchema, {
-          note,
+      uploadSlots: (id: string, files: Array<{ name: string; size: number }>) =>
+        call(
+          "POST",
+          `/milestones/${encodeURIComponent(id)}/delivery/uploads`,
+          UploadSlotsResultSchema,
+          {
+            files,
+          },
+        ),
+      checkDelivery: (id: string, input: DeliveryPayload) =>
+        call(
+          "POST",
+          `/milestones/${encodeURIComponent(id)}/delivery/check`,
+          CheckDeliveryResultSchema,
+          input,
+        ),
+      deliver: (id: string, input: DeliveryPayload) =>
+        call("POST", `/milestones/${encodeURIComponent(id)}/deliver`, DeliverResultSchema, input),
+      fileUrl: (id: string, index: number, kind: "original" | "preview" = "original") =>
+        call(
+          "GET",
+          `/milestones/${encodeURIComponent(id)}/files/${index}?kind=${kind}`,
+          FileUrlSchema,
+        ),
+      requestChanges: (id: string, text: string) =>
+        call(
+          "POST",
+          `/milestones/${encodeURIComponent(id)}/request-changes`,
+          RequestChangesResultSchema,
+          {
+            text,
+          },
+        ),
+      respondToAddon: (id: string, accept: boolean) =>
+        call("POST", `/milestones/${encodeURIComponent(id)}/addon`, MilestoneActionResultSchema, {
+          accept,
         }),
       release: (id: string, opts: { simulateDecline?: boolean } = {}) =>
         call(
@@ -125,6 +182,10 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         ),
       cancel: (id: string) =>
         call("POST", `/milestones/${encodeURIComponent(id)}/cancel`, MilestoneActionResultSchema),
+    },
+    todos: {
+      set: (id: string, done: boolean) =>
+        call("PATCH", `/todos/${encodeURIComponent(id)}`, TodoResultSchema, { done }),
     },
     demo: {
       refund: (milestoneId: string) =>

@@ -35,7 +35,9 @@ export function createMockPaymentProvider(now: () => number = Date.now) {
     captureDelayMs: 0,
   };
   let seq = 0;
-  const id = (p: string) => `${p}-${++seq}`;
+  // Unique per process like real PayPal ids (parallel test files share one database).
+  const run = Math.random().toString(36).slice(2, 8).toUpperCase();
+  const id = (p: string) => `${p}-${run}-${++seq}`;
 
   async function idem<T>(kind: string, key: string, run: () => Promise<T>): Promise<T> {
     state.calls[kind] = (state.calls[kind] ?? 0) + 1;

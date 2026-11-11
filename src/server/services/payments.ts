@@ -4,7 +4,6 @@
 import { randomUUID } from "node:crypto";
 import {
   canTransition,
-  computeReleaseAt,
   hasLiveHold,
   isDueForAutoRelease,
   type MilestoneStatus,
@@ -24,10 +23,8 @@ import { findDeal, type DealRow } from "../repos/deals";
 import {
   findMilestoneBy,
   getPaymentMilestone,
-  hasConsentForVersion,
   listDealMilestones,
   logEvent,
-  nextDeliveryRound,
   updateDealStatusIf,
   updateMilestoneIf,
   type PaymentMilestone,
@@ -227,45 +224,6 @@ export async function confirmHold(auth: AuthContext, milestoneId: string, orderI
     },
   });
   return { status: "held" as const };
-}
-
-// ── Deliver (minimal until Phase 5 adds files + AI check) ────────────────────
-
-export async function deliverMilestone(auth: AuthContext, milestoneId: string, note: string) {
-  const { ms, deal } = await load(milestoneId);
-  requireParty(deal, auth, "freelancer");
-  if (!canTransition(ms.status, "deliver")) {
-    throw new AppError("CONFLICT", "You can deliver once the client has secured this milestone.");
-  }
-  const deliveredAt = new Date();
-  const consent = deal.client_id
-    ? await hasConsentForVersion(admin(), deal.id, deal.current_version, deal.client_id)
-    : false;
-  const releaseAt = computeReleaseAt(deliveredAt, deal.auto_release_hours, consent);
-  const round = await nextDeliveryRound(admin(), ms.id);
-  const updated = await updateMilestoneIf(
-    admin(),
-    ms.id,
-    { status: ms.status },
-    {
-      status: "delivered",
-      delivered_at: deliveredAt.toISOString(),
-      release_at: releaseAt?.toISOString() ?? null,
-    },
-  );
-  if (!updated) throw new AppError("CONFLICT", "This milestone changed. Reload and try again.");
-  const { error } = await admin()
-    .from("deliveries")
-    .insert({ milestone_id: ms.id, round, note: note.slice(0, 5000) });
-  if (error) console.error("delivery insert failed", error.code);
-  await logEvent(admin(), {
-    deal_id: deal.id,
-    milestone_id: ms.id,
-    actor_role: "freelancer",
-    type: "delivered",
-    payload: { round, releaseAt: releaseAt?.toISOString() ?? null },
-  });
-  return { status: "delivered" as const, releaseAt: releaseAt?.toISOString() ?? null };
 }
 
 // ── Release (capture) ────────────────────────────────────────────────────────
@@ -659,3 +617,5 @@ export async function applyPayPalEvent(type: string, resource: unknown): Promise
   }
   return "ignored";
 }
+
+export { load as loadMilestone, requireParty, openNextMilestone };

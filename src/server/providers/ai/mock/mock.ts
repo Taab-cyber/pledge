@@ -63,5 +63,50 @@ export function createMockProvider(opts: AIProviderOptions = {}): AIProvider {
         .map((s) => s.slice(0, 200));
       return { changes };
     },
+
+    /** Mock check: a to-do is met when one of its words (4+ letters) appears in a file name or the note. */
+    async checkDelivery(i) {
+      await logRun("check-delivery@1");
+      const haystack = [...i.files.map((f) => f.name), i.note].join(" ").toLowerCase();
+      const items = i.todos.map((todo) => {
+        const words = todo.toLowerCase().match(/[a-z]{4,}/g) ?? [];
+        const hit = words.find((w) => haystack.includes(w));
+        return hit
+          ? { todo, status: "met" as const, reason: `Found "${hit}" in the delivery.` }
+          : {
+              todo,
+              status: "missing" as const,
+              reason: "Nothing in the files or note matches this.",
+            };
+      });
+      const missing = items.filter((x) => x.status === "missing").length;
+      return {
+        items,
+        summary: missing
+          ? `${missing} item(s) look missing.`
+          : "Everything in the plan looks included.",
+      };
+    },
+    /** Mock scope guard: "also/extra/additional/another/instagram" → out of scope with an add-on. */
+    async classifyRequest(i) {
+      await logRun("classify-request@1");
+      const out = /\b(also|extra|additional|another|instagram|more)\b/i.test(i.message);
+      return out
+        ? {
+            inScope: false,
+            reason: "This asks for work that isn't in the agreed plan.",
+            suggestedAddon: {
+              title: "Instagram templates",
+              todos: ["5 Instagram post templates", "Editable source files"],
+              weight: 15,
+              dueInDays: 5,
+            },
+          }
+        : {
+            inScope: true,
+            reason: "This is about work already in the plan.",
+            suggestedAddon: null,
+          };
+    },
   };
 }

@@ -15,6 +15,7 @@ describe.skipIf(!enabled)("payments flow (integration, mock PayPal)", () => {
   let deals: typeof import("./deals");
   let pub: typeof import("./public-plan");
   let pay: typeof import("./payments");
+  let del: typeof import("./deliveries");
   let hooks: typeof import("./webhooks");
   let supa: typeof import("../repos/supabase");
   let mock: ReturnType<typeof import("../providers/payments/mock/mock").createMockPaymentProvider>;
@@ -46,6 +47,7 @@ describe.skipIf(!enabled)("payments flow (integration, mock PayPal)", () => {
     deals = await import("./deals");
     pub = await import("./public-plan");
     pay = await import("./payments");
+    del = await import("./deliveries");
     hooks = await import("./webhooks");
     supa = await import("../repos/supabase");
     const { createMockPaymentProvider } = await import("../providers/payments/mock/mock");
@@ -135,7 +137,10 @@ describe.skipIf(!enabled)("payments flow (integration, mock PayPal)", () => {
     ).rejects.toMatchObject({ code: "CONFLICT" });
 
     // Delivery with consent → release_at = +72h.
-    const delivered = await pay.deliverMilestone(freelancer, m1!.id, "Concepts attached");
+    const delivered = await del.deliverWork(freelancer, m1!.id, {
+      note: "Concepts attached",
+      files: [],
+    });
     expect(delivered.status).toBe("delivered");
     expect(Date.parse(delivered.releaseAt!) - Date.now()).toBeGreaterThan(71 * 3_600_000);
 
@@ -192,7 +197,7 @@ describe.skipIf(!enabled)("payments flow (integration, mock PayPal)", () => {
     const [, m2] = await milestones();
     const { orderId } = await pay.createHoldOrder(client, m2!.id);
     await pay.confirmHold(client, m2!.id, orderId);
-    await pay.deliverMilestone(freelancer, m2!.id, "Final logo");
+    await del.deliverWork(freelancer, m2!.id, { note: "Final logo", files: [] });
 
     mock.state.failNext.capture = "DECLINED";
     await expect(
@@ -220,7 +225,7 @@ describe.skipIf(!enabled)("payments flow (integration, mock PayPal)", () => {
     const [, , m3] = await milestones();
     const { orderId } = await pay.createHoldOrder(client, m3!.id);
     await pay.confirmHold(client, m3!.id, orderId);
-    await pay.deliverMilestone(freelancer, m3!.id, "Brand kit");
+    await del.deliverWork(freelancer, m3!.id, { note: "Brand kit", files: [] });
 
     mock.state.failNext.renewHold = "REAUTH_NOT_ALLOWED";
     const failed = await pay.renewHold(m3!.id);

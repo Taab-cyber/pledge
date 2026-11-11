@@ -20,7 +20,32 @@ Deadline: Devpost, Nov 12 2026 12:00 PM PT. Our target: Nov 12, 9:00 PM IST.
 - Phase 3 — Deals API + AI plan: **done** (end-to-end test passes with real Gemini)
 - Phase 4 — PayPal holds/capture/void/webhooks + Vercel deploy: **done**, except the live browser run
   (client approves a real sandbox hold in PayPal's popup → capture). The user deferred it to the end.
-- Next: Phase 5 — delivery uploads + previews, AI checkDelivery/classifyRequest, revisions, add-ons.
+- Phase 5 — deliveries, AI check, scope guard, previews, revisions, add-ons: **done** (deployed)
+- Next: Phase 6 — jobs tick (pg_cron + pg_net), Deal Agent approve/dismiss endpoints, demo fast-forward,
+  forced renewal failure. Needs `JOBS_SECRET`.
+
+## Deliveries & scope guard (Phase 5)
+
+- Upload: `POST /milestones/:id/delivery/uploads` → one-time signed upload slots under
+  `<deal>/deliveries/<ms>/incoming/<uuid>`; the browser uploads straight to storage (`uploadDeliveryFiles` in
+  `src/sdk/browser.ts`), bypassing Vercel's 4.5 MB body limit. Server re-downloads, checks size + magic bytes
+  (PNG/JPEG/WebP/SVG/PDF/ZIP), moves to `r<round>/original/`, writes watermarked JPEG previews to `r<round>/preview/`.
+- `POST /milestones/:id/delivery/check` = AI pre-check only (no state change); `POST /milestones/:id/deliver`
+  delivers (AI check stored on the delivery; AI failure never blocks delivery).
+- Originals: `GET /milestones/:id/files/:index` → signed URL (120 s, download attachment). Client gets 403
+  until the milestone is `released`; freelancer always allowed. Previews: signed 10 min, in the deal DTO.
+- AI tasks: `checkDelivery` (vision model, unwatermarked 512px thumbnails, presence only) →
+  `normalizeCheck` aligns items with real to-dos; `classifyRequest` (fast model) → add-on drafted as an
+  `agent_actions` row `propose_addon`; price = `addonAmountFromWeight` (weight % of deal total, whole units, ≥5).
+- Revisions: `POST /milestones/:id/request-changes` uses `consumeRevision`; clears release_at; refused while a
+  capture claim exists. Out of rounds → 409 `REVISIONS_USED_UP` + `propose_extra_revision` agent action.
+- Add-ons: milestones with `kind = 'addon'`; `draft` = offered. `POST /deals/:id/addons` (freelancer, optional
+  `actionId` marks the proposal executed) → `POST /milestones/:id/addon {accept}` (client) → `awaiting_hold`
+  (own PayPal hold) or `voided`. `openNextMilestone` ignores add-ons.
+- Deal Agent rows so far: `release_payment` (for client, after a passing check), `propose_addon`,
+  `propose_extra_revision` (for freelancer). `detail.for` filters who sees them. Approve/Dismiss endpoints: Phase 6.
+- Gotcha: when editing files through `node -e` / sed, `\b` and `\\` get mangled (a backspace char once broke
+  the mock regex). Use the Edit tool for lines with backslashes.
 
 ## Deferred to the end (user's choice)
 
