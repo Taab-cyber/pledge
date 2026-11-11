@@ -15,8 +15,28 @@ Deadline: Devpost, Nov 12 2026 12:00 PM PT. Our target: Nov 12, 9:00 PM IST.
 ## Current phase
 
 - Phase 0 — Skeleton: **done**
-- Phase 1 — Database, auth, security base: **done** (OTP login still to be confirmed by the user)
-- Next: Phase 2 — Domain core (money, currencies, allocate(), state machines). No credentials needed.
+- Phase 1 — Database, auth, security base: **done** (OTP login confirmed working)
+- Phase 2 — Domain core: **done**
+- Next: Phase 3 — Deals API + AI plan. Needs `SUPABASE_SERVICE_ROLE_KEY` in .env.local and an AI key.
+
+## Domain modules (src/server/domain, pure, fully unit-tested)
+
+| File                   | What                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `money.ts`             | `Money {minor: bigint, currency}`, `fromMajor`, `toMajorString`, `format`, `add/sub/sum`   |
+| `currencies.ts`        | USD EUR GBP CAD AUD SGD (exp 2), JPY (exp 0); INR/BRL/MYR are in-country-only              |
+| `countries.ts`         | country → currency; `suggestDealCurrency()` falls back to USD with a `reason`              |
+| `allocate.ts`          | largest-remainder split; exact sum; every part ≥ 1 minor unit; ties → earlier part         |
+| `milestone-machine.ts` | `transition(state, event)`, `computeReleaseAt` (null without consent), `useRevision`, etc. |
+| `deal-machine.ts`      | `dealTransition`, `isPlanEditable` (draft/shared only)                                     |
+| `plan.ts`              | `validatePlan` (issue list), `canShare`, `planFromWeights` (AI weights → amounts)          |
+| `limits.ts`            | `LIMITS`, `checkTotal` (5–10 000 major units)                                              |
+| `consent.ts`           | deterministic `consentText`, `sha256Hex`, `consentRecord`                                  |
+| `share-token.ts`       | 32-byte base64url token, SHA-256 hash, timing-safe match, `whatsappLink`                   |
+
+Milestone events: open_for_hold, hold_confirmed, deliver, request_changes, release, renewal_failed,
+renewed, resecure, void. A failed renewal can hit held / delivered / changes_requested → hold_at_risk
+(auto-release then stops because it only fires from `delivered`).
 
 ## Supabase
 
@@ -90,4 +110,5 @@ docs/                # DEMO.md (phase 4+)
 ## Open decisions
 
 - AI provider/key: ask at Phase 3 (default assumption: Anthropic).
+- Total limit is 10 000 major units in every currency (per brief), so JPY deals cap at ¥10 000 (~$65).
 - PayPal reauthorization limits: read current docs in Phase 4 and note them here.
