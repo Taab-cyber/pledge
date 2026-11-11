@@ -18,7 +18,50 @@ Deadline: Devpost, Nov 12 2026 12:00 PM PT. Our target: Nov 12, 9:00 PM IST.
 - Phase 1 — Database, auth, security base: **done** (OTP login confirmed working)
 - Phase 2 — Domain core: **done**
 - Phase 3 — Deals API + AI plan: **done** (end-to-end test passes with real Gemini)
-- Next: Phase 4 — PayPal holds, capture, void, webhooks; deploy to Vercel. Needs PayPal sandbox app + accounts.
+- Phase 4 — PayPal holds/capture/void/webhooks + Vercel deploy: **done**, except the live browser run
+  (client approves a real sandbox hold in PayPal's popup → capture). The user deferred it to the end.
+- Next: Phase 5 — delivery uploads + previews, AI checkDelivery/classifyRequest, revisions, add-ons.
+
+## Deferred to the end (user's choice)
+
+- Live sandbox run on https://pledge-one.vercel.app: sign in as `daniel@demo.pledge.test` (DEMO_PASSWORD in
+  .env.local) → open the demo deal from `npm run demo:prepare` → PayPal button → approve with the GB sandbox
+  payer `PAYPAL_SANDBOX_PERSONAL_EMAIL` → freelancer delivers → client "Approve and pay" → check Riya's
+  sandbox account. The user types all passwords themselves.
+
+## PayPal (Phase 4)
+
+- Sandbox app "Pledge" (developer account of Mehtaab Kohli). Payee (Riya) = `PAYPAL_SANDBOX_BUSINESS_EMAIL`
+  (IN Business). Payer (Daniel) = `PAYPAL_SANDBOX_PERSONAL_EMAIL` (a GB Business test account; can pay).
+  PayPal blocks IN→IN payments, so payer and payee must be in different countries.
+- Flow: `POST /milestones/:id/hold` creates an AUTHORIZE order (payee = freelancer email) → PayPal JS SDK
+  buttons → `POST /milestones/:id/hold/confirm {orderId}` authorizes server-side (order id must match the
+  one stored). Capture `final_capture: true` with `Prefer: return=representation` for the fee breakdown.
+- Double-capture guard: release first sets `capture_claim` (conditional update, one winner), then captures with
+  `PayPal-Request-Id = <milestone>:capture:<attempt>`. Integration-tested with 3 parallel releases.
+- Reauthorization rules (docs, Nov 2026): allowed only AFTER the 3-day honor period, from day 4 to 29 of the
+  29-day authorization, multiple times; a reauthorized hold gets a new 3-day honor period; amount up to 115%
+  (+$75 max) in the US. Early reauth returns a real PayPal error → used for the "hold at risk" demo.
+  Negative testing (`PayPal-Mock-Response`) is NOT supported on reauthorize; it is on capture/void/orders.
+  Renewal request id includes the row's `updated_at`, so a retry after a failure isn't replayed from cache.
+- Webhook id `PAYPAL_WEBHOOK_ID` for `<APP_URL>/api/webhooks/paypal` (register: `node scripts/register-paypal-webhook.mjs <url>`).
+- Demo-only: `simulateDecline` on release (INSTRUMENT_DECLINED via negative testing), `POST /api/v1/demo/refund`.
+
+## Deploy (Vercel, user's own account "taab-cyber")
+
+- Live: **https://pledge-one.vercel.app** (project `pledge`, team `taab-cybers-projects`).
+- `node scripts/deploy-vercel.mjs` syncs env vars from .env.local (values never printed; secrets "sensitive"),
+  sets APP_URL to the production domain and runs `vercel deploy --prod`. `.vercelignore` excludes `.env*`.
+  VERCEL_TOKEN (30-day, project-scoped) is in .env.local.
+- Run `npm run build` before deploying: Next 16 + cacheComponents requires `<Suspense>` around client
+  components that read URL data (useParams/useSearchParams), or prerendering fails.
+
+## Scripts
+
+`npm run demo:prepare` (demo users + fresh approved demo deal) · `npx tsx scripts/reset-demo-password.ts` ·
+`npx tsx scripts/check-paypal-order.ts <dealId>` (real sandbox order, read back) ·
+`npm run test:integration` (real DB; payments use the mock PayPal) · `npm run db:migrate` (needs SUPABASE_DB_URL;
+otherwise paste migrations into the SQL Editor; Chrome automation used so far).
 
 ## Deals API (Phase 3)
 
@@ -94,6 +137,7 @@ pg_cron + pg_net → /api/jobs/tick · sharp · Frankfurter (ECB) FX estimates �
 | ------------------------------------------------- | --------------------------------------------- |
 | `npm run dev`                                     | dev server on :3000                           |
 | `npm run check`                                   | lint + typecheck + tests (run once per phase) |
+| `npm run build`                                   | production build (run before deploying)       |
 | `npm run lint` / `npm run typecheck` / `npm test` | individually                                  |
 | `npx vitest run <path>`                           | run only related tests while working          |
 | `npm run format`                                  | Prettier                                      |
