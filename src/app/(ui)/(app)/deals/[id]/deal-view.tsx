@@ -55,7 +55,13 @@ export function DealView() {
       .catch(
         () =>
           alive &&
-          setConfig({ demoMode: false, paypalClientId: null, countries: [], currencies: [] }),
+          setConfig({
+            demoMode: false,
+            paypalClientId: null,
+            countries: [],
+            currencies: [],
+            demoPlanUrl: null,
+          }),
       );
     return () => {
       alive = false;

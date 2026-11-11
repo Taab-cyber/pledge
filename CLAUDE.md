@@ -22,7 +22,29 @@ Deadline: Devpost, Nov 12 2026 12:00 PM PT. Our target: Nov 12, 9:00 PM IST.
   (client approves a real sandbox hold in PayPal's popup → capture). The user deferred it to the end.
 - Phase 5 — deliveries, AI check, scope guard, previews, revisions, add-ons: **done** (deployed)
 - Phase 6 — jobs tick + Deal Agent + fast-forward: **done** (pg_cron → pg_net → live tick verified, 200)
-- Next: Phase 7 — UI polish on the SDK, judge "Try as freelancer/client", seed data, README, docs/DEMO.md, LICENSE.
+- Phase 7 — UI, judge access, seed data, docs: **done** (deployed)
+- Remaining: the user's live PayPal browser run (see "Deferred to the end"), the demo video, Devpost
+  submission, and filling the sandbox buyer password into the submission notes (not in the repo).
+
+## UI (Phase 7)
+
+- Route groups: `src/app/(ui)/page.tsx` (landing), `login`, `p/[token]` (public plan, no login), and
+  `(app)/…` for signed-in pages wrapped by `_ui/app-shell.tsx` (sidebar on desktop, menu on mobile; `useMe()`
+  gives the profile). `(app)/layout.tsx` sets `export const instant = false`.
+- Pages: `(app)/deals` (dashboard / client portal: stat tiles + table, `DealListItem` has held/released/
+  releasedThisMonth/nextStep/waitingOnYou), `(app)/deals/new`, `(app)/deals/[id]` (deal page),
+  `(app)/deals/[id]/plan` (plan editor + share screen), `(app)/me` (profile/onboarding).
+- Kit: `_ui/kit.tsx` (Button, Card, PageHeader, StatTile, Pill, Banner, Field, DealStatus, MilestoneStatus).
+  Tokens in `globals.css` (`bg-accent`, `text-ink-soft`, `bg-warn-bg`, …).
+- Pages using `useParams`/`useSearchParams` are client components wrapped in `<Suspense>` by a tiny server
+  `page.tsx` (Next 16 rule). Dev-only console warning "instant navigation" on client pages is harmless.
+- Judge access: `POST /api/v1/demo/login {as}` signs in server-side with DEMO_* env and returns tokens
+  (browser `setSession`). `POST /api/v1/demo/deliver {milestoneId, skipLast}` makes the demo freelancer deliver
+  one generated sample image per to-do. Config returns `countries`, `currencies`, `demoPlanUrl` (DEMO_SHARE_URL).
+- Seed: `npm run demo:prepare` resets Riya's deals, adds 2 finished example deals (capture ids `SEED-…`) and one
+  fresh plan shared with Daniel; writes DEMO_SHARE_URL → redeploy. Re-sharing rotates the link, so reseed after.
+- Gemini: retries a 5xx once, then falls back to the other free model.
+- Docs: README.md, docs/DEMO.md (judge click path), LICENSE (MIT).
 
 ## Jobs, Deal Agent, demo (Phase 6)
 

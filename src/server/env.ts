@@ -33,6 +33,8 @@ const serverEnvSchema = z
     DEMO_FREELANCER_EMAIL: optional(z.email()),
     DEMO_CLIENT_EMAIL: optional(z.email()),
     DEMO_PASSWORD: optional(z.string().min(12)),
+    /** Share link of the seeded demo plan (written by npm run demo:prepare), shown to the demo client. */
+    DEMO_SHARE_URL: optional(z.url()),
   })
   .superRefine((env, ctx) => {
     if (env.AI_PROVIDER === "gemini" && !env.GEMINI_API_KEY) {

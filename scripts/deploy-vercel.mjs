@@ -54,6 +54,7 @@ const plain = [
   "GEMINI_FAST_MODEL",
   "DEMO_FREELANCER_EMAIL",
   "DEMO_CLIENT_EMAIL",
+  "DEMO_SHARE_URL",
 ];
 const secret = [
   "SUPABASE_SERVICE_ROLE_KEY",

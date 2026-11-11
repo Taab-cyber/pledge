@@ -87,22 +87,25 @@ export function createGeminiProvider(cfg: GeminiConfig, opts: AIProviderOptions 
       },
     });
     let res: Response | undefined;
-    // The free tier sometimes answers 500/503 ("overloaded"): retry once after a short pause.
-    for (let attempt = 0; attempt < 2; attempt++) {
+    // The free tier sometimes answers 500/503 ("high demand"): retry once after a short pause,
+    // then fall back to the other free model (both read images) for a third try.
+    const models =
+      model === cfg.fastModel ? [model, model, cfg.model] : [model, model, cfg.fastModel];
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        res = await doFetch(`${API}/${encodeURIComponent(model)}:generateContent`, {
+        res = await doFetch(`${API}/${encodeURIComponent(models[attempt]!)}:generateContent`, {
           method: "POST",
           headers: { "content-type": "application/json", "x-goog-api-key": cfg.apiKey },
           body,
           signal: AbortSignal.timeout(cfg.timeoutMs ?? 90_000),
         });
       } catch (err) {
-        if (attempt === 0) continue;
+        if (attempt < 2) continue;
         throw new AppError("UPSTREAM", "The AI service didn't respond. Please try again.", {
           cause: err instanceof Error ? err.name : "unknown",
         });
       }
-      if (res.status < 500 || attempt === 1) break;
+      if (res.status < 500 || attempt === 2) break;
       await new Promise((r) => setTimeout(r, cfg.retryDelayMs ?? 1500));
     }
     if (!res) throw new AppError("UPSTREAM", "The AI service didn't respond. Please try again.");

@@ -29,6 +29,7 @@ export default function DealsPage() {
   const { me } = useMe();
   const [list, setList] = useState<DealList | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [demoPlanUrl, setDemoPlanUrl] = useState<string | null>(null);
   const isClient = me.profile.role === "client";
 
   useEffect(() => {
@@ -36,6 +37,10 @@ export default function DealsPage() {
       .list()
       .then(setList)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Could not load deals."));
+    api
+      .config()
+      .then((c) => setDemoPlanUrl(c.demoPlanUrl))
+      .catch(() => setDemoPlanUrl(null));
   }, []);
 
   const deals = list?.deals ?? [];
@@ -54,6 +59,14 @@ export default function DealsPage() {
       />
 
       {error && <Banner tone="error">{error}</Banner>}
+      {isClient && demoPlanUrl && (
+        <Banner tone="info" title="Demo: Riya sent you a plan on WhatsApp">
+          <a href={demoPlanUrl} className="font-semibold underline">
+            Open the plan
+          </a>{" "}
+          to approve it, secure the first milestone with PayPal (sandbox), and review her delivery.
+        </Banner>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <StatTile

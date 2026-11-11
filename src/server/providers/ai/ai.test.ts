@@ -254,3 +254,32 @@ describe("delivery and scope prompts", () => {
     ).toBe(false);
   });
 });
+
+describe("gemini overload fallback", () => {
+  it("falls back to the other model when the main one stays overloaded", async () => {
+    const urls: string[] = [];
+    const fetchMock = (async (url: string) => {
+      urls.push(url);
+      return url.includes("/models/big:")
+        ? new Response("high demand", { status: 503 })
+        : Response.json({
+            candidates: [{ content: { parts: [{ text: JSON.stringify(MOCK_PLAN) }] } }],
+          });
+    }) as unknown as typeof fetch;
+    const ai = createGeminiProvider({
+      apiKey: "k",
+      model: "big",
+      fastModel: "small",
+      fetch: fetchMock,
+      retryDelayMs: 0,
+    });
+    const plan = await ai.buildPlan({
+      images: [],
+      totalMajor: "400",
+      currency: "GBP",
+      startDate: "2026-11-12",
+    });
+    expect(plan.milestones).toHaveLength(3);
+    expect(urls.map((u) => u.split("/models/")[1]!.split(":")[0])).toEqual(["big", "big", "small"]);
+  });
+});

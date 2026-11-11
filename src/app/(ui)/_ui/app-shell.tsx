@@ -138,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {who}
           </div>
         )}
-        <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
+        <main className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 p-4 md:p-8">
           {!me.onboarded && path !== "/me" && (
             <Banner tone="warn" title="Finish your profile">
               <Link href="/me" className="underline">

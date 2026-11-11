@@ -406,6 +406,7 @@ export const AppConfigSchema = z.object({
     )
     .default([]),
   currencies: z.array(z.string()).default([]),
+  demoPlanUrl: z.string().nullable().default(null),
 });
 
 export const DemoLoginResultSchema = z.object({
