@@ -333,3 +333,29 @@ describe("breakdownFromPayPal", () => {
     });
   });
 });
+
+describe("order body for the JS SDK buttons", () => {
+  it("never sends payment_source (it would make PayPal expect a redirect checkout)", async () => {
+    const calls: Array<{ body: unknown }> = [];
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      if (url.endsWith("/v1/oauth2/token"))
+        return Response.json({ access_token: "t", expires_in: 3600 });
+      calls.push({ body: JSON.parse(init.body as string) });
+      return Response.json({ id: "O", status: "CREATED" }, { status: 201 });
+    }) as unknown as typeof fetch;
+    await createPayPalProvider({ clientId: "a", clientSecret: "b", fetch: fetchImpl }).createHold({
+      milestoneId: "m",
+      amount: money(5000n, "USD"),
+      payeeEmail: "p@x.co",
+      description: "d",
+      invoiceId: "i",
+      idempotencyKey: "k",
+    });
+    const body = calls[0]!.body as Record<string, unknown>;
+    expect(body.payment_source).toBeUndefined();
+    expect(body.application_context).toMatchObject({
+      shipping_preference: "NO_SHIPPING",
+      user_action: "CONTINUE",
+    });
+  });
+});

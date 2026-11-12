@@ -236,14 +236,13 @@ export function createPayPalProvider(cfg: PayPalConfig): PaymentProvider {
               payee: { email_address: i.payeeEmail },
             },
           ],
-          payment_source: {
-            paypal: {
-              experience_context: {
-                brand_name: "Pledge",
-                shipping_preference: "NO_SHIPPING",
-                user_action: "CONTINUE",
-              },
-            },
+          // No payment_source here: with payment_source.paypal (and no return/cancel URLs) PayPal makes
+          // the order a redirect checkout (PAYER_ACTION_REQUIRED) and the JS SDK popup can't complete it.
+          // application_context keeps the order in CREATED, which the buttons approve normally.
+          application_context: {
+            brand_name: "Pledge",
+            shipping_preference: "NO_SHIPPING",
+            user_action: "CONTINUE",
           },
         },
       });
