@@ -23,8 +23,22 @@ Deadline: Devpost, Nov 12 2026 12:00 PM PT. Our target: Nov 12, 9:00 PM IST.
 - Phase 5 — deliveries, AI check, scope guard, previews, revisions, add-ons: **done** (deployed)
 - Phase 6 — jobs tick + Deal Agent + fast-forward: **done** (pg_cron → pg_net → live tick verified, 200)
 - Phase 7 — UI, judge access, seed data, docs: **done** (deployed)
-- Remaining: the user's live PayPal browser run (see "Deferred to the end"), the demo video, Devpost
-  submission, and filling the sandbox buyer password into the submission notes (not in the repo).
+- Phase 8 (optional): Playwright smoke test **done** (`npm run e2e`, 3 passing). AG Grid and email
+  notifications **not started** (AG Grid needs the user to confirm the sponsor rules; email needs a provider key).
+- Remaining: live PayPal popup approval (the Claude browser pane's PayPal overlay didn't complete; the order
+  stayed PAYER_ACTION_REQUIRED). Fallback: buyer approves at
+  `https://www.sandbox.paypal.com/checkoutnow?token=<orderId>` in a normal browser, then
+  `npx tsx scripts/confirm-hold.ts <milestoneId>`. Also: demo video, Devpost submission, sandbox buyer password
+  in the submission notes (not in the repo).
+
+## E2E (Phase 8)
+
+- `npm run e2e` (Playwright, Chromium in `D:/.devcache/ms-playwright`: set `PLAYWRIGHT_BROWSERS_PATH` first).
+  Starts `next build && next start -p 3200` with `AI_PROVIDER=mock`, `DEMO_MODE=true`; uses the demo accounts
+  via "Try as …"; creates its own deal and deletes it afterwards. Dev mode is too flaky (pages reload while
+  compiling), so it tests the production build. Stop any `next dev` for this folder first (one per folder).
+- Deploy script fix: Vercel's `POST /env?upsert=true` did NOT overwrite existing values; the script now PATCHes
+  existing keys and POSTs new ones.
 
 ## UI (Phase 7)
 

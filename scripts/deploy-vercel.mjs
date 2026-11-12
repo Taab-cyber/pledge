@@ -77,9 +77,32 @@ for (const key of [...plain, ...secret]) {
   });
 }
 vars.push({ key: "APP_URL", value: appUrl, type: "plain", target: ["production", "preview"] });
-const env = await vercel("POST", `/v10/projects/${projectId}/env?upsert=true`, vars);
-if (env.status >= 300)
-  throw new Error(`Could not set env vars: ${JSON.stringify(env.json).slice(0, 300)}`);
+// "upsert" on POST doesn't overwrite existing values, so update existing keys with PATCH and only
+// POST new ones.
+const existing = (await vercel("GET", `/v10/projects/${projectId}/env`)).json.envs ?? [];
+const toCreate = [];
+for (const v of vars) {
+  const found = existing.find((e) => e.key === v.key);
+  if (!found) {
+    toCreate.push(v);
+    continue;
+  }
+  const res = await vercel("PATCH", `/v9/projects/${projectId}/env/${found.id}`, {
+    value: v.value,
+    type: v.type,
+    target: v.target,
+  });
+  if (res.status >= 300) {
+    // Type changes (e.g. plain → sensitive) can't be patched: recreate the variable.
+    await vercel("DELETE", `/v9/projects/${projectId}/env/${found.id}`);
+    toCreate.push(v);
+  }
+}
+if (toCreate.length) {
+  const env = await vercel("POST", `/v10/projects/${projectId}/env`, toCreate);
+  if (env.status >= 300)
+    throw new Error(`Could not set env vars: ${JSON.stringify(env.json).slice(0, 300)}`);
+}
 console.log("env vars synced:", vars.map((v) => v.key).join(", "));
 
 // 3) Link this folder to the project for the CLI, then deploy.

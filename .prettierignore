@@ -5,3 +5,5 @@ package-lock.json
 next-env.d.ts
 BUILD.md
 PLEDGE_HACKATHON_BUILD.md
+test-results
+playwright-report

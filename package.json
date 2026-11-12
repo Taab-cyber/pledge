@@ -17,7 +17,8 @@
     "db:status": "node scripts/db.mjs status",
     "db:test-rls": "node scripts/db.mjs sql supabase/tests/rls_isolation.sql",
     "test:integration": "vitest run integration",
-    "demo:prepare": "tsx scripts/prepare-demo.ts"
+    "demo:prepare": "tsx scripts/prepare-demo.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -29,6 +30,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^24.19.2",
     "@types/pg": "^8.23.1",
