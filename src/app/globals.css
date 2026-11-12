@@ -1,23 +1,27 @@
 @import "tailwindcss";
 
-/* Pledge design tokens (BUILD.md §9 Phase 7). Light theme: the brand palette is designed for it. */
+/* Pledge design tokens — blue/white payments-first theme */
 :root {
   color-scheme: light;
-  --accent: #0b6e5b;
-  --accent-soft: #e7f3ef;
-  --ink: #101828;
-  --ink-soft: #475467;
-  --ground: #f3f5f4;
+  --accent: #00a5ec;
+  --accent-dark: #0878bd;
+  --accent-soft: #eaf7ff;
+  --ink: #172b4d;
+  --ink-soft: #6d7f95;
+  --ground: #f4f8fc;
   --card: #ffffff;
-  --line: #e4e7ec;
+  --line: #e6edf3;
   --warn-ink: #8a4b00;
   --warn-bg: #fff6e6;
   --error-ink: #a3261a;
   --error-bg: #fdf0ef;
+  --sidebar-bg: #ffffff;
+  --sidebar-ink: #43556b;
 }
 
 @theme inline {
   --color-accent: var(--accent);
+  --color-accent-dark: var(--accent-dark);
   --color-accent-soft: var(--accent-soft);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);

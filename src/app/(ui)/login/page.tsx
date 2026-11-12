@@ -4,11 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, supabaseBrowser } from "@/sdk/browser";
-import { Banner, Button, Card, Field, inputClass } from "../_ui/kit";
+import { Banner, Button, Field, inputClass } from "../_ui/kit";
 
 type Step = "email" | "code" | "password";
 
-/** Where to go after signing in: ?next=/path (same-site paths only). */
 function nextPath(): string {
   const next = new URLSearchParams(window.location.search).get("next");
   return next && next.startsWith("/") && !next.startsWith("//") ? next : "/deals";
@@ -80,7 +79,6 @@ export default function LoginPage() {
     });
   };
 
-  /** Judges: the server signs in to the seeded demo account and hands back a session. */
   const tryAs = (as: "freelancer" | "client") =>
     run(as, async () => {
       const s = await api.demo.login(as);
@@ -93,123 +91,254 @@ export default function LoginPage() {
     });
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-5 p-4">
-      <Link href="/" className="text-2xl font-bold text-accent">
-        Pledge
+    <div
+      style={{
+        minHeight: "100dvh",
+        background: "linear-gradient(135deg,#f0faff 0%,#e8f7ff 55%,#f8fcff 100%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      {/* Logo */}
+      <Link href="/" style={{ textDecoration: "none", marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              background: "#00a5ec",
+              display: "grid",
+              placeItems: "center",
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: 17,
+              boxShadow: "0 4px 12px rgba(0,165,236,.3)",
+            }}
+          >
+            P
+          </div>
+          <span style={{ fontWeight: 800, fontSize: 22, letterSpacing: "-0.6px", color: "#002970" }}>
+            Pledge
+          </span>
+        </div>
       </Link>
 
-      {demoMode && (
-        <Card className="flex flex-col gap-3 border-accent">
-          <h2 className="font-semibold">Judging Pledge? Skip sign-up</h2>
-          <p className="text-sm text-ink-soft">
-            Use the demo accounts: Riya, a brand designer in India, and Daniel, her client in the
-            UK. Payments run on the PayPal sandbox (no real money).
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button disabled={!!busy} onClick={() => tryAs("client")}>
-              {busy === "client" ? "Signing in…" : "Try as client"}
-            </Button>
-            <Button variant="secondary" disabled={!!busy} onClick={() => tryAs("freelancer")}>
-              {busy === "freelancer" ? "Signing in…" : "Try as freelancer"}
-            </Button>
+      <div style={{ width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: 14 }}>
+        {/* Demo card */}
+        {demoMode && (
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #9ddcf5",
+              borderRadius: 12,
+              padding: "20px 22px",
+              boxShadow: "0 4px 16px rgba(0,165,236,.12)",
+            }}
+          >
+            <div
+              style={{
+                display: "inline-block",
+                background: "#eaf7ff",
+                color: "#087fbd",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.8px",
+                textTransform: "uppercase",
+                padding: "4px 8px",
+                borderRadius: 4,
+                marginBottom: 10,
+              }}
+            >
+              Demo Access
+            </div>
+            <h2 style={{ fontWeight: 700, fontSize: 16, color: "#172b4d", margin: "0 0 8px" }}>
+              Judging Pledge? Skip sign-up
+            </h2>
+            <p style={{ fontSize: 12, color: "#6d7f95", lineHeight: 1.6, margin: "0 0 16px" }}>
+              Use demo accounts — Riya (brand designer, India) and Daniel (client, UK). PayPal sandbox, no real money.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <button
+                disabled={!!busy}
+                onClick={() => tryAs("client")}
+                style={{
+                  minHeight: 42,
+                  borderRadius: 7,
+                  border: "none",
+                  background: "#00a5ec",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(0,165,236,.25)",
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                {busy === "client" ? "Signing in…" : "👤 Try as client"}
+              </button>
+              <button
+                disabled={!!busy}
+                onClick={() => tryAs("freelancer")}
+                style={{
+                  minHeight: 42,
+                  borderRadius: 7,
+                  border: "1px solid #d6e2ec",
+                  background: "#fff",
+                  color: "#496078",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                {busy === "freelancer" ? "Signing in…" : "🎨 Try as freelancer"}
+              </button>
+            </div>
           </div>
-        </Card>
-      )}
+        )}
 
-      <Card className="flex flex-col gap-4">
-        <h1 className="text-xl font-semibold">Sign in</h1>
+        {/* Sign-in card */}
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #e6edf3",
+            borderRadius: 12,
+            padding: "24px 24px",
+            boxShadow: "0 2px 12px rgba(28,66,101,.06)",
+          }}
+        >
+          <h1 style={{ fontWeight: 700, fontSize: 20, color: "#172b4d", margin: "0 0 20px", letterSpacing: "-0.5px" }}>
+            Sign in
+          </h1>
 
-        {step === "email" && (
-          <form onSubmit={sendCode} className="flex flex-col gap-3">
-            <Field label="Email">
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Button type="submit" disabled={!!busy}>
-              {busy === "code" ? "Sending…" : "Email me a code"}
-            </Button>
-            {demoMode && (
+          {step === "email" && (
+            <form onSubmit={sendCode} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <Field label="Email">
+                <input
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClass}
+                  placeholder="you@example.com"
+                />
+              </Field>
+              <Button type="submit" disabled={!!busy} style={{ minHeight: 44 }}>
+                {busy === "code" ? "Sending…" : "Email me a code →"}
+              </Button>
+              {demoMode && (
+                <button
+                  type="button"
+                  onClick={() => setStep("password")}
+                  style={{
+                    minHeight: 40,
+                    background: "none",
+                    border: "none",
+                    fontSize: 12,
+                    color: "#8b9bae",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                  }}
+                >
+                  Demo account with a password
+                </button>
+              )}
+            </form>
+          )}
+
+          {step === "code" && (
+            <form onSubmit={verify} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <p style={{ fontSize: 13, color: "#6d7f95", margin: 0, lineHeight: 1.6 }}>
+                We sent a 6-digit code to <strong style={{ color: "#172b4d" }}>{email}</strong>.
+              </p>
+              <Field label="Code">
+                <input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className={`${inputClass} tracking-widest`}
+                  placeholder="000000"
+                />
+              </Field>
+              <Button type="submit" disabled={!!busy} style={{ minHeight: 44 }}>
+                {busy === "verify" ? "Checking…" : "Sign in →"}
+              </Button>
               <button
                 type="button"
-                onClick={() => setStep("password")}
-                className="min-h-11 text-sm text-ink-soft underline"
+                onClick={() => setStep("email")}
+                style={{
+                  minHeight: 40,
+                  background: "none",
+                  border: "none",
+                  fontSize: 12,
+                  color: "#8b9bae",
+                  textDecoration: "underline",
+                  cursor: "pointer",
+                }}
               >
-                Demo account with a password
+                Use a different email
               </button>
-            )}
-          </form>
-        )}
+            </form>
+          )}
 
-        {step === "code" && (
-          <form onSubmit={verify} className="flex flex-col gap-3">
-            <p className="text-sm text-ink-soft">We sent a 6-digit code to {email}.</p>
-            <Field label="Code">
-              <input
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                required
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className={`${inputClass} tracking-widest`}
-              />
-            </Field>
-            <Button type="submit" disabled={!!busy}>
-              {busy === "verify" ? "Checking…" : "Sign in"}
-            </Button>
-            <button
-              type="button"
-              onClick={() => setStep("email")}
-              className="min-h-11 text-sm text-ink-soft underline"
-            >
-              Use a different email
-            </button>
-          </form>
-        )}
+          {step === "password" && (
+            <form onSubmit={withPassword} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <Banner tone="warn">Demo accounts only. Real users sign in with an email code.</Banner>
+              <Field label="Email">
+                <input
+                  type="email"
+                  required
+                  autoComplete="username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Password">
+                <input
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Button type="submit" disabled={!!busy} style={{ minHeight: 44 }}>
+                {busy === "password" ? "Signing in…" : "Sign in →"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setStep("email")}
+                style={{
+                  minHeight: 40,
+                  background: "none",
+                  border: "none",
+                  fontSize: 12,
+                  color: "#8b9bae",
+                  textDecoration: "underline",
+                  cursor: "pointer",
+                }}
+              >
+                Use an email code instead
+              </button>
+            </form>
+          )}
 
-        {step === "password" && (
-          <form onSubmit={withPassword} className="flex flex-col gap-3">
-            <Banner tone="warn">Demo accounts only. Real users sign in with an email code.</Banner>
-            <Field label="Email">
-              <input
-                type="email"
-                required
-                autoComplete="username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Password">
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Button type="submit" disabled={!!busy}>
-              {busy === "password" ? "Signing in…" : "Sign in"}
-            </Button>
-            <button
-              type="button"
-              onClick={() => setStep("email")}
-              className="min-h-11 text-sm text-ink-soft underline"
-            >
-              Use an email code instead
-            </button>
-          </form>
-        )}
+          {error && <div style={{ marginTop: 12 }}><Banner tone="error">{error}</Banner></div>}
+        </div>
 
-        {error && <Banner tone="error">{error}</Banner>}
-      </Card>
-    </main>
+        <p style={{ textAlign: "center", fontSize: 11, color: "#8b9bae", margin: 0 }}>
+          Pledge never holds money — PayPal pays freelancers directly.
+        </p>
+      </div>
+    </div>
   );
 }
