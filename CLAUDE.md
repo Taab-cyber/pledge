@@ -25,7 +25,7 @@ Deadline: Devpost, Nov 12 2026 12:00 PM PT. Our target: Nov 12, 9:00 PM IST.
 - Phase 7 — UI, judge access, seed data, docs: **done** (deployed)
 - Phase 8 (optional): Playwright smoke test **done** (`npm run e2e`, 3 passing). AG Grid and email
   notifications **not started** (AG Grid needs the user to confirm the sponsor rules; email needs a provider key).
-- Remaining: live PayPal popup approval (the Claude browser pane's PayPal overlay didn't complete; the order
+- PayPal popup flow verified end to end on Nov 12 (hold 2JM71787D26238150 → capture 7P774558LD157484R, $50 gross, $2.66 fee, $47.34 net). Fixes: orders use application_context (no payment_source), and the JS SDK loads once (a second load destroyed the checkout). Fallback if a popup fails: buyer approves at
   stayed PAYER_ACTION_REQUIRED). Fallback: buyer approves at
   `https://www.sandbox.paypal.com/checkoutnow?token=<orderId>` in a normal browser, then
   `npx tsx scripts/confirm-hold.ts <milestoneId>`. Also: demo video, Devpost submission, sandbox buyer password
