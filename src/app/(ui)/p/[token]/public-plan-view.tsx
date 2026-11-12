@@ -27,7 +27,12 @@ export function PublicPlanView() {
     if (!plan) return;
     setBusy(true);
     setError(null);
-    const { data } = await supabaseBrowser().auth.getSession();
+    const { data } = await Promise.race([
+      supabaseBrowser().auth.getSession(),
+      new Promise<{ data: { session: null } }>((r) =>
+        setTimeout(() => r({ data: { session: null } }), 8_000),
+      ),
+    ]);
     if (!data.session) {
       router.push(`/login?next=${encodeURIComponent(`/p/${token}`)}`);
       return;

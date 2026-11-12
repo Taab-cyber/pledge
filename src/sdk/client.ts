@@ -73,6 +73,13 @@ export interface ApiClientOptions {
   fetch?: typeof fetch;
 }
 
+/** Long enough for AI checks and PayPal captures (Vercel functions stop at 60 s anyway). */
+const REQUEST_TIMEOUT_MS = 70_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
+}
+
 export function createApiClient(opts: ApiClientOptions = {}) {
   const base = opts.baseUrl ?? "";
   const doFetch = opts.fetch ?? fetch;
@@ -84,17 +91,32 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     body?: unknown,
   ): Promise<z.infer<S>> {
     const headers: Record<string, string> = { accept: "application/json" };
-    const token = await opts.getAccessToken?.();
+    // Never wait forever: a stuck session read falls back to the cookie session, and a stuck request
+    // becomes an error the page can show instead of an endless spinner.
+    const token = await withTimeout(opts.getAccessToken?.() ?? Promise.resolve(null), 8_000, null);
     if (token) headers.authorization = `Bearer ${token}`;
     const isForm = typeof FormData !== "undefined" && body instanceof FormData;
     if (body !== undefined && !isForm) headers["content-type"] = "application/json";
 
-    const res = await doFetch(`${base}/api/v1${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
-      credentials: "same-origin",
-    });
+    let res: Response;
+    try {
+      res = await doFetch(`${base}/api/v1${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
+        credentials: "same-origin",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch (e) {
+      const timedOut = e instanceof DOMException && e.name === "TimeoutError";
+      throw new ApiError(
+        0,
+        timedOut ? "TIMEOUT" : "NETWORK",
+        timedOut
+          ? "This is taking too long. Refresh the page to see if it went through."
+          : "Couldn't reach Pledge. Check your connection and try again.",
+      );
+    }
     const json: unknown = await res.json().catch(() => null);
     if (!res.ok) {
       const parsed = ErrorBodySchema.safeParse(json);
